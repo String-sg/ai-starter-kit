@@ -12,10 +12,10 @@ This kit will automatically:
  -  Enable semantic search on uploaded documents via [LanceDB](https://lancedb.com/)
  -  Preset custom prompt engineering to guide interactions for Q&A
 
-> [!NOTE]  
-> This app comes with the following user roles: admins, teachers, and students
 
 ## User-role specific features
+> [!NOTE]  
+> This app comes with the following user roles: admins, teachers, and students
  - **Admins** can reset passwords of students and teachers
  - **Teachers** can add and remove documents 
  - **Teachers** can build and remove knowledge base (VectorStores)
