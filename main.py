@@ -13,10 +13,13 @@ from PIL import Image
 def main():
 	st.title("CherGPT Starter Kit")
 	sac.divider(label='A String Initiative', icon='house', align='center', direction='horizontal', dashed=False, bold=False)
-	openai.api_key = st.secrets["openai_key"]
+	if st.secrets["openai_key"] != "None":
+		st.session_state.api_key  = st.secrets["openai_key"]
+		openai.api_key = st.secrets["openai_key"]
+
 	create_dbs()
 	create_admin_account()
-
+		
 	if "option" not in st.session_state:
 		st.session_state.option = False
 	
@@ -54,7 +57,7 @@ def main():
 		st.image(image)
 
 		if st.session_state.login == False:
-			st.session_state.option = menu([MenuItem('Users login', icon='people'), MenuItem('Application Info', icon='info-circle')])
+			st.session_state.option = menu([MenuItem('Users login', icon='people'), MenuItem('Application Info', icon='info-circle'), MenuItem('OpenAI API Key', icon='key-fill')])
 	
 		else:
 
@@ -100,7 +103,14 @@ def main():
 						st.session_state.prompt_profile = load_current_template(st.session_state.user["username"])
 						st.experimental_rerun()
 			
-
+	elif st.session_state.option == 'OpenAI API Key':
+		if st.secrets["openai_key"] != "None":
+			st.success("OpenAI API key is deployed in this application")
+		else:
+			API_KEY = st.text_input("Please enter your OpenAI API KEY",type="password")
+			if API_KEY:
+				st.session_state.api_key = API_KEY 
+				openai.api_key = st.session_state.api_key
 
 	elif st.session_state.option == 'Application Info':
 		st.markdown("Application Information here")

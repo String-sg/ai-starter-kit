@@ -12,9 +12,14 @@ from langchain.vectorstores import LanceDB
 import lancedb
 import pickle
 
-os.environ["OPENAI_API_KEY"] = st.secrets["openai_key"]
-openai.api_key = st.secrets["openai_key"]
-embeddings = OpenAIEmbeddings()
+if "api_key" not in st.session_state:
+	st.session_state.api_key = False
+
+if st.session_state.api_key:
+	os.environ["OPENAI_API_KEY"] = st.session_state.api_key
+	openai.api_key = st.session_state.api_key
+	embeddings = OpenAIEmbeddings()
+
 # Create or check for the 'database' directory in the current working directory
 cwd = os.getcwd()
 database_path = os.path.join(cwd, "database")

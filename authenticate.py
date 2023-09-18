@@ -8,8 +8,12 @@ def login_function():
         submit_button = st.form_submit_button("Login")
          # On submit, check if new passwords match and then update the password.
         if submit_button:
+            if st.session_state.api_key == False:
+                st.error("Please enter a valid OpenAI API key")
+                return False
             if check_password(username, password):
                 return True
             else:
+                st.error("Username and Password is incorrect")
                 return False
     pass
