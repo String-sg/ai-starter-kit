@@ -19,3 +19,9 @@ Other features
  - share documents among the 5 teachers
  - students can load their own knowledge base for their own chatbot
 
+You can fork it at streamlit community cloud, it can be used straight away, just add the following to your streamlit secrets
+
+openai_key = "XXXXXXX_YOUR_API_KEY"
+default_db = "chergpt.db"
+default_temp = 0
+default_model = "gpt-4"
