@@ -19,7 +19,9 @@ def main():
 
 	create_dbs()
 	create_admin_account()
-		
+	if "api_key" not in st.session_state:
+		st.session_state.api_key = False
+
 	if "option" not in st.session_state:
 		st.session_state.option = False
 	
@@ -111,6 +113,8 @@ def main():
 			if API_KEY:
 				st.session_state.api_key = API_KEY 
 				openai.api_key = st.session_state.api_key
+			else:
+				st.session_state.api_key = False
 
 	elif st.session_state.option == 'Application Info':
 		st.markdown("Application Information here")
