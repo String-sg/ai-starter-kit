@@ -105,7 +105,7 @@ def main():
 						st.session_state.prompt_profile = load_current_template(st.session_state.user["username"])
 						st.experimental_rerun()
 				with col2:
-					st.write("To try out the application:)
+					st.write("To try out the application:")
 					st.write("1. Enter your OpenAI API Key")
 					st.write("2. Teacher's account: tch1 password: pass1234")
 					st.write("3. Student's account: stu1 password: pwd1")
