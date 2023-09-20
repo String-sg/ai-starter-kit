@@ -33,3 +33,4 @@ default_db = "chergpt.db"
 default_temp = 0
 default_model = "gpt-4"
 ```
+# co_pandai
