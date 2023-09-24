@@ -47,5 +47,5 @@ To run this locally
 <br><br>
 **Questions?** Ask them on <br>
 
-[![WhatsApp]][https://chat.whatsapp.com/LTNrg30pSil6vuq4zpnhc2]
-[![Discord]][https://discord.gg/dYKVqzfdNH]
+[![WhatsApp]](https://chat.whatsapp.com/LTNrg30pSil6vuq4zpnhc2)
+[![Discord]](https://discord.gg/dYKVqzfdNH)
