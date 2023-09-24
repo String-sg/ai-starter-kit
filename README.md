@@ -3,9 +3,10 @@ Enabling teachers to experiment with LLM/ Generative AI in a Q&A chatbot
 <img width="689" alt="chergpt-starter-kit" src="https://github.com/String-sg/chergpt-starter-kit/assets/44336310/3d8ce9e7-acf8-44e9-b28a-19156cc6dbe8">
 
 This kit will automatically:
- - Create a login page and all the features of a full stack application using ant_components 
+ - Create a login page with styled components using [ant_components](https://ant.design/components/overview)*
  - Create an administrator account, password is pass1234 in a SQL Database
  - Generate 5 teachers account and 40 students
+*See documentation for streamlit-antd-components [here](https://pypi.org/project/streamlit-antd-components/)
 
 ## Key Features:
  -  Upload documents and build a knowledge base using the OpenAI embeddings
@@ -26,7 +27,7 @@ This kit will automatically:
 You can fork it at streamlit community cloud, it can be used straight away, just add the following to your streamlit secrets
 
 > [!IMPORTANT]  
-> The following env variables are required for setup. You can add this to the secrets.toml file in your streamlit deployment 
+> The following env variables are required for setup. You can add this to the `secrets.toml` file in your streamlit deployment 
 ```
 openai_key = "XXXXXXX_YOUR_API_KEY"
 default_db = "chergpt.db"
