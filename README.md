@@ -5,8 +5,8 @@ Enabling teachers to experiment with LLM/ Generative AI in a Q&A chatbot
 This kit will automatically:
  - Create a login page with styled components using [ant_components](https://ant.design/components/overview)*
  - Create an administrator account, password is pass1234 in a SQL Database
- - Generate 5 teachers account and 40 students
-*See documentation for streamlit-antd-components [here](https://pypi.org/project/streamlit-antd-components/)
+ - Generate 5 teachers account and 40 students<br>
+_* See documentation for streamlit-antd-components [here](https://pypi.org/project/streamlit-antd-components/)_
 
 ## Key Features:
  -  Upload documents and build a knowledge base using the OpenAI embeddings
