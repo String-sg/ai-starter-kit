@@ -33,4 +33,5 @@ default_db = "chergpt.db"
 default_temp = 0
 default_model = "gpt-4"
 ```
-
+*Note, even though gpt-4 is the default model, you can also change the default model to:
+`default_model = gpt-3.5-turbo`
