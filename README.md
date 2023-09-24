@@ -37,6 +37,8 @@ default_model = "gpt-4"
 *Note, even though gpt-4 is the default model, you can also change the default model to:<br>
 `default_model = gpt-3.5-turbo`
 <br><br>
+
+## Setting up local dev env
 To run this locally, first clone it to your local computer via Git. See [here](https://teachertech.beehiiv.com/p/git-for-beginners) for a crash course to git.
 <br><br>
 Prior to running locally, you will need to install required dependencies via this command
@@ -45,6 +47,4 @@ Prior to running locally, you will need to install required dependencies via thi
 To run this locally
 ```streamlit run app.py```
 <br><br>
-**Questions?** Ask them on <br>
-
-[WhatsApp](https://chat.whatsapp.com/LTNrg30pSil6vuq4zpnhc2) | [Discord](https://discord.gg/dYKVqzfdNH)
+**Questions?** Ask them on [WhatsApp](https://chat.whatsapp.com/LTNrg30pSil6vuq4zpnhc2) | [Discord](https://discord.gg/dYKVqzfdNH)
