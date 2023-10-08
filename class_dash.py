@@ -3,100 +3,159 @@ import csv
 import streamlit as st
 import pandas as pd
 import os
-
+import configparser
+import os
+import ast
 # Create or check for the 'database' directory in the current working directory
 cwd = os.getcwd()
-database_path = os.path.join(cwd, "database")
+WORKING_DIRECTORY = os.path.join(cwd, "database")
 
-if not os.path.exists(database_path):
-    os.makedirs(database_path)
+if not os.path.exists(WORKING_DIRECTORY):
+	os.makedirs(WORKING_DIRECTORY)
 
-# Set DB_NAME to be within the 'database' directory
-DB_NAME = os.path.join(database_path, st.secrets["default_db"])
+if st.secrets["sql_ext_path"] == "None":
+	WORKING_DATABASE= os.path.join(WORKING_DIRECTORY , st.secrets["default_db"])
+else:
+	WORKING_DATABASE= st.secrets["sql_ext_path"]
+class ConfigHandler:
+    def __init__(self):
+        self.config = configparser.ConfigParser()
+        self.config.read('config.ini')
+
+    def get_config_values(self, section, key):
+        value = self.config.get(section, key)
+        try:
+            # Try converting the string value to a Python data structure
+            return ast.literal_eval(value)
+        except (SyntaxError, ValueError):
+            # If not a data structure, return the plain string
+            return value
+		
+config_handler = ConfigHandler()
+TCH = config_handler.get_config_values('constants', 'TCH')
+STU = config_handler.get_config_values('constants', 'STU')
+SA = config_handler.get_config_values('constants', 'SA')
+AD = config_handler.get_config_values('constants', 'AD')
 
 def display_data(data, columns):
     df = pd.DataFrame(data, columns=columns)
     st.dataframe(df)
 
-
 def fetch_all_data():
     # Connect to the specified database
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
 
     # Fetch all data from data_table
-    cursor.execute("SELECT * FROM data_table")
+    cursor.execute("SELECT * FROM Data_Table")
     rows = cursor.fetchall()
     column_names = [description[0] for description in cursor.description]
     
     conn.close()
     return rows, column_names
 
-def fetch_vectors_by_username(username):
+def fetch_data_by_username(user_id):
     # Connect to the specified database
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
 
     # Fetch data from data_table based on the given username
-    cursor.execute("SELECT * FROM vector_dbs WHERE username=?", (username,))
+    cursor.execute("SELECT * FROM Data_Table WHERE user_id=?", (user_id,))
     rows = cursor.fetchall()
     column_names = [description[0] for description in cursor.description]
     
     conn.close()
     return rows, column_names
 
-def fetch_all_vectors():
+def diagnose_issue(sch_id):
+    with sqlite3.connect(WORKING_DATABASE) as conn:
+        cursor = conn.cursor()
+
+        # Check for users of the given school
+        cursor.execute("SELECT user_id FROM Users WHERE school_id=?", (sch_id,))
+        user_ids = [row[0] for row in cursor.fetchall()]
+
+        if not user_ids:
+            return f"No users found for school_id {sch_id}"
+
+        # Check data for these users
+        cursor.execute('''
+            SELECT Data_Table.data_id 
+            FROM Data_Table
+            WHERE Data_Table.user_id IN ({})
+        '''.format(','.join('?' for _ in user_ids)), user_ids)
+
+        data_ids = [row[0] for row in cursor.fetchall()]
+
+        if not data_ids:
+            return f"No data entries found for users {user_ids}"
+        
+        return f"Data entries found for the users: {data_ids}"
+
+def fetch_data_by_school(sch_id):
     # Connect to the specified database
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
-
-    # Fetch data from data_table based on the given username
-    cursor.execute("SELECT * FROM vector_dbs")
-    rows = cursor.fetchall()
-    column_names = [description[0] for description in cursor.description]
+    # Fetch data from Data_Table for all users of the given school using JOIN
+    cursor.execute('''
+            SELECT Data_Table.* 
+            FROM Data_Table
+            JOIN Users ON Data_Table.user_id = Users.user_id
+            WHERE Users.school_id=?
+        ''', (sch_id,))
     
+    data_rows = cursor.fetchall()
+    data_column_names = [description[0] for description in cursor.description]
     conn.close()
-    return rows, column_names
+    
+    return data_rows, data_column_names
 
-def fetch_data_by_username(username):
+def fetch_data_by_sa(sch_id):
     # Connect to the specified database
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
-
-    # Fetch data from data_table based on the given username
-    cursor.execute("SELECT * FROM data_table WHERE username=?", (username,))
-    rows = cursor.fetchall()
-    column_names = [description[0] for description in cursor.description]
+    # Fetch data from Data_Table for all users of the given school using JOIN
+    cursor.execute('''
+            SELECT Data_Table.* 
+            FROM Data_Table
+            JOIN Users ON Data_Table.user_id = Users.user_id
+            WHERE Users.school_id=? OR Users.school_id IS NULL
+        ''', (sch_id,))
     
+    data_rows = cursor.fetchall()
+    data_column_names = [description[0] for description in cursor.description]
     conn.close()
-    return rows, column_names
+    
+    return data_rows, data_column_names
 
-def fetch_data_by_username_and_profile(username, profile):
+def fetch_data_by_school(sch_id):
     # Connect to the specified database
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
-
-    # Fetch data from data_table based on the given username and profile
-    cursor.execute("SELECT * FROM data_table WHERE username=? AND profile=?", (username, profile))
-    rows = cursor.fetchall()
-    column_names = [description[0] for description in cursor.description]
+    # Fetch data from Data_Table for all users of the given school using JOIN
+    cursor.execute('''
+            SELECT Data_Table.* 
+            FROM Data_Table
+            JOIN Users ON Data_Table.user_id = Users.user_id
+            WHERE Users.school_id=?
+        ''', (sch_id,))
     
+    data_rows = cursor.fetchall()
+    data_column_names = [description[0] for description in cursor.description]
     conn.close()
-    return rows, column_names
+    
+    return data_rows, data_column_names
 
-def download_data_table_csv(username, profile, db_name=DB_NAME):
-    d = False
-    c = False
-    if profile == "student":
-        data, columns = fetch_data_by_username(username)
-    elif profile == "teacher":
-        data, columns = fetch_data_by_username_and_profile(username, profile)
-    else: #administrator
-        data, columns = fetch_all_data()
-        d,c =fetch_all_vectors()
-    if d and c: 
-        st.write("Knowledge Base Databases")
-        display_data(d,c)
+
+def download_data_table_csv(user_id, sch_id, profile):
+    if profile == SA:#super admin
+        data, columns = fetch_data_by_sa(sch_id)
+        
+    elif profile == AD:#administrator or super admin
+        data, columns = fetch_data_by_school(sch_id)
+    else: 
+        data, columns = fetch_data_by_username(user_id)
+        
     st.write("Conversation data")
     display_data(data, columns)
     # Write the data to a CSV file
@@ -121,7 +180,3 @@ def download_data_table_csv(username, profile, db_name=DB_NAME):
             file_name=filename,
             mime='text/csv',
         )
-
-# In your Streamlit app:
-# display_data()
-# download_data_table_csv()
