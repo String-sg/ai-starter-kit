@@ -32,7 +32,10 @@ You can fork it at streamlit community cloud, it can be used straight away, just
 openai_key = "XXXXXXX_YOUR_API_KEY"
 default_db = "chergpt.db"
 default_temp = 0
+default_frequency_penalty = 0.0
+default_presence_penalty = 0.0
 default_model = "gpt-4"
+sql_ext_path = "None"
 ```
 *Note, even though gpt-4 is the default model, you can also change the default model to:<br>
 `default_model = gpt-3.5-turbo`
