@@ -96,7 +96,20 @@ def lesson_collaborator():
     st.subheader("3. Lesson Details for Generator")
     prior_knowledge = st.text_area("Prior Knowledge")
     learners_info = st.text_input("Describe the learners for this lesson")
-    incorporate_elements = st.text_area("Incorporate lesson elements")
+    pedagogy = [" Blended Learning", "Concrete-Pictorial-Abstract",
+                "Flipped Learning", "Others"]
+    # Create the multiselect component
+    selected_options = st.multiselect(
+        "What teaching pedagogy will you use for your lesson ?", pedagogy)
+    other_option = ''  # Initialize the variable
+    # Others probably should be a custom component - Kahhow to refactor down the line
+    if "Others" in selected_options:
+        other_option = st.text_input("Please specify the 'Other' option:")
+    if other_option and "Others" in selected_options:  # Ensure "Others" exists before removing
+        selected_options.remove("Others")
+        selected_options.append(other_option)
+
+    # st.write("You selected:", ", ".join(selected_options))
 
     build = sac.buttons([
         dict(label='Generate', icon='check-circle-fill', color='green'),
@@ -104,7 +117,7 @@ def lesson_collaborator():
     ], label=None, index=1, format_func='title', align='center', position='top', size='default', direction='horizontal', shape='round', type='default', compact=False)
 
     if build != 'Cancel':
-        lesson_prompt = f"""You must act as an expert teacher teaching in Singapore. I will provide you with details about my lesson, and it will be your job to think deeply and write a detailed lesson plan. I want you to design a lesson where students make sense of information and knowledge to achieve deep understanding through interacting with content, their peers or teachers and reflecting on their learning. The lesson plan should be simple yet detailed enough for any teacher to understand and carry out the lesson:
+        lesson_prompt = f"""You must act as an expert teacher teaching in Singapore. I will provide you with details about my lesson, and it will be your job to think deeply and write a detailed lesson plan. I want you to design a lesson where students make sense of information and knowledge to achieve deep understanding through interacting with content, their peers or teachers and reflecting on their learning. The lesson plan should be simple yet detailed enough for any teacher to understand and carry out the lesson. At the top of the lesson plan, display the following information:
                             Subject: {subject}
                             Topic: {topic}
 							Grade Level: {level}
@@ -112,7 +125,12 @@ def lesson_collaborator():
                             Skill Level: {skill_level}
                             Description of Learners: {learners_info}
                             Student's prior knowledge: {prior_knowledge}
-                            Incorporate the following lesson elements: {incorporate_elements}"""
+                            Incorporate the following lesson elements: {pedagogy}.
+        Organize the information in a table with 4 columns. 
+		Column #1 - {total_duration}
+		Column #2 - As relevant, indicate any of the four categories: Activate Learning, Promote Thinking and Discussion, Facilitate Demonstration of Learning and Monitor and Provide Feedback. 
+		Column #3 - Detailed description of activities and questions that can promote students’ critical thinking according to the four categories stated in Column #2.
+		Column #4 - Justify the reason why you chose those activities and questions."""
         st.success("Your lesson generation information has been submitted!")
         return lesson_prompt
 
