@@ -76,16 +76,18 @@ def upload_lesson_plan():
 def lesson_collaborator():
     st.subheader("1. Basic Lesson Information for Generator")
     subject = st.selectbox("Choose a Subject", SUBJECTS_SINGAPORE)
-    age_or_grade = st.text_input("Age or Grade Level")
-    lessons = st.text_input("Number of lessons/ periods")
+    age_or_grade = st.text_input("Grade Level")
+    lessons = st.number_input(
+        "Number of lessons/ periods", min_value=1.0, step=0.5, format='%.2f')
     duration = st.number_input(
-        "How long is a period/ lesson (in minutes)", min_value=30, step=1, format='%i')
+        "How long is a period/ lesson (in minutes)", min_value=30, step=5, format='%i')
+    total_duration = lessons * duration
 
     st.subheader("2. Lesson Details for Generator")
     topic = st.text_area(
         "Topic", help="Describe the specific topic or theme for the lesson")
     skill_level = st.selectbox("Ability or Skill Level", [
-                               "Beginner", "Intermediate", "Advanced", "Mixed"])
+        "Beginner", "Intermediate", "Advanced", "Mixed"])
 
     st.subheader("3. Lesson Details for Generator")
     prior_knowledge = st.text_area("Prior Knowledge")
@@ -101,8 +103,8 @@ def lesson_collaborator():
         lesson_prompt = f"""You must act as an expert teacher teaching in Singapore. I will provide you with details about my lesson, and it will be your job to think deeply and write a detailed lesson plan. I want you to design a lesson where students make sense of information and knowledge to achieve deep understanding through interacting with content, their peers or teachers and reflecting on their learning. The lesson plan should be simple yet detailed enough for any teacher to understand and carry out the lesson:
                             Subject: {subject}
                             Topic: {topic}
-                            Age or Grade Level: {age_or_grade}
-                            Duration: {duration} minutes
+							Grade Level: {age_or_grade}
+                            Duration: {total_duration} minutes spread across {lessons} of lessons
                             Skill Level: {skill_level}
                             Description of Learners: {learners_info}
                             Student's prior knowledge: {prior_knowledge}
@@ -123,7 +125,7 @@ def lesson_commentator():
     topic = st.text_area(
         "Topic", help="Describe the specific topic or theme for the lesson")
     skill_level = st.selectbox("Ability or Skill Level", [
-                               "Beginner", "Intermediate", "Advanced", "Mixed"])
+        "Beginner", "Intermediate", "Advanced", "Mixed"])
 
     st.subheader("3. Lesson Plan upload or key in manually")
     lesson_plan_content = upload_lesson_plan()
