@@ -435,7 +435,7 @@ def main():
 						)
 				if steps_options == "step 1":
 					if create_flag:
-						st.write("Statutory board created, click on Step 2")
+						st.write("School created, click on Step 2")
 					else:
 						create_org_structure()
 				elif steps_options == "step 2":

@@ -69,7 +69,8 @@ def upload_lesson_plan():
 		# Removing the temporary file after processing
 		os.remove(temp_file_path)
 		return docs
-
+	
+#kahhow to change 
 def lesson_collaborator():
     st.subheader("1. Basic Lesson Information for Generator")
     subject = st.selectbox("Choose a Subject", SUBJECTS_SINGAPORE)
