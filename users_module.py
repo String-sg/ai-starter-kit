@@ -26,6 +26,8 @@ DEFAULT_TEXT = config_handler.get_config_values('constants', 'DEFAULT_TEXT')
 PROMPT_TEMPLATES_FUNCTIONS = config_handler.get_config_values('menu_lists', 'PROMPT_TEMPLATES_FUNCTIONS')
 SA = config_handler.get_config_values('constants', 'SA')
 AD = config_handler.get_config_values('constants', 'AD')
+GENERATOR_PROMPT = config_handler.get_config_values('Prompt_Design_Templates', 'GENERATOR_PROMPT')
+FEEDBACK_PROMPT = config_handler.get_config_values('Prompt_Design_Templates', 'FEEDBACK_PROMPT')
 
 # Create or check for the 'database' directory in the current working directory
 cwd = os.getcwd()
@@ -315,6 +317,12 @@ def pre_load_variables(user_id):
                 st.session_state[session_key] = existing_templates.get(function_name, DEFAULT_TEXT)
 
         conn.commit()
+        #pre load the lesson generator prompt from config ini
+        if st.session_state.lesson_generator == DEFAULT_TEXT:
+            st.session_state.lesson_generator = GENERATOR_PROMPT
+        #pre load the feedback generator prompt from config ini
+        if st.session_state.lesson_feedback == DEFAULT_TEXT:
+            st.session_state.lesson_feedback = FEEDBACK_PROMPT    
 
         # Fetch user_id and profile_id using user_id
         cursor.execute('''
@@ -411,7 +419,7 @@ def chat_bot_vectorstore_selection_interface(user_id, c1, c2):
                         st.success("Preference saved successfully!")
                     else:
                         st.error("Error in retrieving the selected VectorStore ID.")
-                st.experimental_rerun()     
+                st.rerun()()     
     else:
         with c1:
             st.write("No KB available.")
@@ -593,7 +601,7 @@ def vectorstore_selection_interface(user_id):
         # Use the constructed options in Streamlit's selectbox
         selected_vs_name = st.selectbox("Select Knowledge Base:", options, index=0)
         
-        if st.button("Save Knowledge Base Preference"):
+        if st.button("Load/Unload KB"):
             if selected_vs_name != "Unload KB":
                 # Retrieve the selected vs_id
                 selected_vs_id = next((vs['vs_id'] for vs in available_vectorstores if vs['vectorstore_name'] == selected_vs_name), None)
@@ -689,6 +697,4 @@ def load_and_fetch_vectorstore_for_user(user_id):
         # Set data to Streamlit's session state
         st.session_state.vs = vector_data
         st.session_state.current_model = vectorstore_name
-
-
 

@@ -1,17 +1,18 @@
 import streamlit as st
 import openai
 import sqlite3
+from authenticate import return_api_key
 from datetime import datetime
 from langchain.memory import ConversationSummaryBufferMemory
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.chat_models import ChatOpenAI
 import streamlit_antd_components as sac
 from k_map import (
-    generate_mindmap, 
-    map_prompter_with_mermaid_syntax, 
-    map_prompter_with_plantuml,
-    generate_plantuml_mindmap,
-    render_diagram
+	generate_mindmap, 
+	map_prompter_with_mermaid_syntax, 
+	map_prompter_with_plantuml,
+	generate_plantuml_mindmap,
+	render_diagram
 )
 from audio import record_myself
 import configparser
@@ -19,6 +20,9 @@ import os
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+NEW_PLAN  = config['constants']['NEW_PLAN']
+FEEDBACK_PLAN = config['constants']['FEEDBACK_PLAN']
+PERSONAL_PROMPT = config['constants']['PERSONAL_PROMPT']
 DEFAULT_TEXT = config['constants']['DEFAULT_TEXT']
 
 # Create or check for the 'database' directory in the current working directory
@@ -33,12 +37,17 @@ if st.secrets["sql_ext_path"] == "None":
 else:
 	WORKING_DATABASE= st.secrets["sql_ext_path"]
 
-if "api_key" not in st.session_state:
-	st.session_state.api_key = False
-if st.secrets["openai_key"] != "None":
-	st.session_state.api_key  = st.secrets["openai_key"]
-	openai.api_key = st.secrets["openai_key"]
-	os.environ["OPENAI_API_KEY"] = st.secrets["openai_key"]
+def set_chat_prompts(dict_buttons, key):
+	# Extract values from the dictionary and store in a list
+	button_labels = [dict_buttons.get(f"sent_{i+1}", "disabled") for i in range(5)]
+	
+	# Create button items using the extracted labels
+	button_items = [sac.ButtonsItem(label=label) for label in button_labels]
+	
+	str = sac.buttons(button_items, index=None, format_func='title', align='left', size='small', key=key)
+	if str:
+		return str
+
 
 
 def metacognitive_prompter(full_response):
@@ -55,18 +64,18 @@ def rating_component():
 	rating_value = sac.rate(label='Response ratings:', position='left', clear=True, value=2.0, align='left', size=15, color='#25C3B0')
 	return rating_value
 
-def insert_into_data_table(date, chatbot_ans,user_prompt, tokens, value=0):
-    conn = sqlite3.connect(WORKING_DATABASE)
-    cursor = conn.cursor()
+def insert_into_data_table(date, chatbot_ans,user_prompt, tokens, function_name, value=0):
+	conn = sqlite3.connect(WORKING_DATABASE)
+	cursor = conn.cursor()
 
-    # Insert data into Data_Table using preloaded session state value
-    cursor.execute('''
-        INSERT INTO Data_Table (date, user_id, profile_id, chatbot_ans, user_prompt, tokens, response_rating)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (date, st.session_state.data_profile["user_id"], st.session_state.data_profile["profile_id"],  chatbot_ans, user_prompt, tokens, value))
+	# Insert data into Data_Table using preloaded session state value
+	cursor.execute('''
+		INSERT INTO Data_Table (date, user_id, profile_id, chatbot_ans, user_prompt, function_name, tokens, response_rating)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	''', (date, st.session_state.data_profile["user_id"], st.session_state.data_profile["profile_id"],  chatbot_ans, user_prompt, function_name, tokens, value))
 
-    conn.commit()
-    conn.close()
+	conn.commit()
+	conn.close()
 
 #clear messages and memory
 def clear_session_states():
@@ -104,6 +113,8 @@ def memory_buffer_qa_component(prompt):
 
 #chat completion memory for streamlit using memory buffer
 def chat_completion_qa_memory(prompt):
+	openai.api_key = return_api_key()
+	os.environ["OPENAI_API_KEY"] = return_api_key()
 	prompt_template = memory_buffer_qa_component(prompt)
 	response = openai.ChatCompletion.create(
 		model=st.session_state.openai_model,
@@ -119,12 +130,29 @@ def chat_completion_qa_memory(prompt):
 	return response
 
 #integration API call into streamlit chat components with memory and qa
-def basebot_qa_memory():
+
+def basebot_qa_memory(bot_name):
+	
+	greetings_str = f"Hi, I am {bot_name}"
+	help_str = "How can I help you today?"
+	# Check if st.session_state.msg exists, and if not, initialize with greeting and help messages
+	if 'msg' not in st.session_state:
+		st.session_state.msg = [
+			{"role": "assistant", "content": greetings_str},
+			{"role": "assistant", "content": help_str}
+		]
+	elif st.session_state.msg == []:
+		st.session_state.msg = [
+			{"role": "assistant", "content": greetings_str},
+			{"role": "assistant", "content": help_str}
+		]
+	
 	for message in st.session_state.msg:
 		with st.chat_message(message["role"]):
-			st.markdown(message["content"])
+			st.markdown(message["content"])	
+	
 	try:
-		if prompt := st.chat_input("What is up?"):
+		if prompt := st.chat_input("Enter your query"):
 			st.session_state.msg.append({"role": "user", "content": prompt})
 			with st.chat_message("user"):
 				st.markdown(prompt)
@@ -145,15 +173,21 @@ def basebot_qa_memory():
 			st.session_state["memory"].save_context({"input": prompt},{"output": full_response})
 			 # Insert data into the table
 			now = datetime.now() # Using ISO format for date
-			num_tokens = len(full_response)*1.3
+			num_tokens = len(full_response + prompt)*1.3
 			#st.write(num_tokens)
-			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, feedback_value)
+			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, bot_name, feedback_value)
 			if st.session_state.visuals == True:
 				metacognitive_prompter(full_response)
 			#metacognitive_prompter(full_response)
 			
+			
+			
 	except Exception as e:
 		st.exception(e)
+
+
+
+
 #below ------------------------------ base bot , K=2 memory for short term memory---------------------------------------------
 #faster and more precise but no summary
 def memory_buffer_component():
@@ -171,6 +205,8 @@ def memory_buffer_component():
 
 #chat completion memory for streamlit using memory buffer
 def chat_completion_memory(prompt):
+	openai.api_key = return_api_key()
+	os.environ["OPENAI_API_KEY"] = return_api_key()	
 	prompt_template = memory_buffer_component()
 	#st.write("Prompt Template ", prompt_template)
 	response = openai.ChatCompletion.create(
@@ -187,7 +223,20 @@ def chat_completion_memory(prompt):
 	return response
 
 #integration API call into streamlit chat components with memory
-def basebot_memory():
+def basebot_memory(bot_name):
+	greetings_str = f"Hi, I am {bot_name}"
+	help_str = "How can I help you today?"
+	# Check if st.session_state.msg exists, and if not, initialize with greeting and help messages
+	if 'msg' not in st.session_state:
+		st.session_state.msg = [
+			{"role": "assistant", "content": greetings_str},
+			{"role": "assistant", "content": help_str}
+		]
+	elif st.session_state.msg == []:
+		st.session_state.msg = [
+			{"role": "assistant", "content": greetings_str},
+			{"role": "assistant", "content": help_str}
+		]
 	for message in st.session_state.msg:
 		with st.chat_message(message["role"]):
 			st.markdown(message["content"])
@@ -212,9 +261,9 @@ def basebot_memory():
 			st.session_state["memory"].save_context({"input": prompt},{"output": full_response})
 			 # Insert data into the table
 			now = datetime.now() # Using ISO format for date
-			num_tokens = len(full_response)*1.3
+			num_tokens = len(full_response + prompt)*1.3
 			#st.write(num_tokens)
-			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, feedback_value)
+			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, bot_name, feedback_value)
 			if st.session_state.visuals == True:
 				metacognitive_prompter(full_response)
 
@@ -227,6 +276,8 @@ def basebot_memory():
 #below ------------------------------ base bot , no memory ---------------------------------------------
 #chat completion for streamlit function
 def chat_completion(prompt):
+	openai.api_key = return_api_key()
+	os.environ["OPENAI_API_KEY"] = return_api_key()
 	response = openai.ChatCompletion.create(
 		model=st.session_state.openai_model,
 		messages=[
@@ -239,7 +290,20 @@ def chat_completion(prompt):
 	return response
 
 #integration API call into streamlit chat components
-def basebot():
+def basebot(bot_name):
+	greetings_str = f"Hi, I am {bot_name}"
+	help_str = "How can I help you today?"
+	# Check if st.session_state.msg exists, and if not, initialize with greeting and help messages
+	if 'msg' not in st.session_state:
+		st.session_state.msg = [
+			{"role": "assistant", "content": greetings_str},
+			{"role": "assistant", "content": help_str}
+		]
+	elif st.session_state.msg == []:
+		st.session_state.msg = [
+			{"role": "assistant", "content": greetings_str},
+			{"role": "assistant", "content": help_str}
+		]
 	for message in st.session_state.msg:
 		with st.chat_message(message["role"]):
 			st.markdown(message["content"])
@@ -262,9 +326,9 @@ def basebot():
 				else:
 					feedback_value = 0
 				now = datetime.now() # Using ISO format for date
-			num_tokens = len(full_response)*1.3
+			num_tokens = len(full_response + prompt)*1.3
 			st.session_state.msg.append({"role": "assistant", "content": full_response})
-			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, feedback_value)
+			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, bot_name, feedback_value)
 			if st.session_state.visuals == True:
 				metacognitive_prompter(full_response)
 				
@@ -293,6 +357,8 @@ def qa_component(prompt):
 
 #chat completion with vectorstore for streamlit 
 def chat_completion_qa(prompt):
+	openai.api_key = return_api_key()
+	os.environ["OPENAI_API_KEY"] = return_api_key()
 	#show the qa component results in the prompt
 	prompt_template = qa_component(prompt)
 	response = openai.ChatCompletion.create(
@@ -309,7 +375,20 @@ def chat_completion_qa(prompt):
 	return response
 
 #chat completion with vectorstore for streamlit 
-def basebot_qa():
+def basebot_qa(bot_name):
+	greetings_str = f"Hi, I am {bot_name}"
+	help_str = "How can I help you today?"
+	# Check if st.session_state.msg exists, and if not, initialize with greeting and help messages
+	if 'msg' not in st.session_state:
+		st.session_state.msg = [
+			{"role": "assistant", "content": greetings_str},
+			{"role": "assistant", "content": help_str}
+		]
+	elif st.session_state.msg == []:
+		st.session_state.msg = [
+			{"role": "assistant", "content": greetings_str},
+			{"role": "assistant", "content": help_str}
+		]
 	for message in st.session_state.msg:
 		with st.chat_message(message["role"]):
 			st.markdown(message["content"])
@@ -334,9 +413,9 @@ def basebot_qa():
 			st.session_state.msg.append({"role": "assistant", "content": full_response})
 			 # Insert data into the table
 			now = datetime.now() # Using ISO format for date
-			num_tokens = len(full_response)*1.3
+			num_tokens = len(full_response + prompt)*1.3
 			#st.write(num_tokens)
-			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, feedback_value)
+			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, bot_name, feedback_value)
 			if st.session_state.visuals == True:
 				metacognitive_prompter(full_response)
 			#metacognitive_prompter(full_response)
@@ -377,7 +456,7 @@ def search_bot():
 			st.session_state.msg.append({"role": "assistant", "content": full_response})
 			 # Insert data into the table
 			now = datetime.now() # Using ISO format for date
-			num_tokens = len(full_response)*1.3
+			num_tokens = len(full_response + prompt)*1.3
 			#st.write(num_tokens)
 			insert_into_data_table(now.strftime("%d/%m/%Y %H:%M:%S"),  full_response, prompt, num_tokens, feedback_value)
 			if st.session_state.visuals == True:
@@ -386,13 +465,6 @@ def search_bot():
 
 	except Exception as e:
 		st.error(e)
-
-
-
-
-
-
-
 
 
 #below ------------------------------ base bot , summary memory for long conversation---------------------------------------------
@@ -409,4 +481,6 @@ def memory_summary_component(prompt): #currently not in use
 						Summary of current conversation:
 						{mem}"""
 	
-	return prompt_template 
+	return prompt_template
+
+

@@ -3,11 +3,13 @@ import sqlite3
 import streamlit_antd_components as sac
 import pandas as pd
 import os
+import openai
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import LanceDB
-import lancedb
+from authenticate import return_api_key
+import lancedb  
 import pickle
 import configparser
 import ast
@@ -31,6 +33,7 @@ TCH = config_handler.get_config_values('constants', 'TCH')
 STU = config_handler.get_config_values('constants', 'STU')
 SA = config_handler.get_config_values('constants', 'SA')
 AD = config_handler.get_config_values('constants', 'AD')
+
 
 
 # Create or check for the 'database' directory in the current working directory
@@ -242,6 +245,8 @@ def save_to_vectorstores(vs, vstore_input_name, subject, topic, username, share_
     conn.close()
 
 def create_vectorstore():
+    openai.api_key = return_api_key()
+    os.environ["OPENAI_API_KEY"] = return_api_key()
     full_docs = []
     st.subheader("Enter the topic and subject for your knowledge base")
     embeddings = OpenAIEmbeddings()
@@ -294,7 +299,7 @@ def create_vectorstore():
             
             db = LanceDB.from_documents(full_docs, OpenAIEmbeddings(), connection=create_lancedb_table(embeddings, meta, vs_name)) 
             save_to_vectorstores(db, vs_name, subject, topic, st.session_state.user["username"], share_resource)  # Passing the share_resource to the function
-            st.success("Knowledge Base created successfully!")
+            st.success("Knowledge Base loaded")
 
     else:
         st.write("No files found in the database.")
@@ -318,22 +323,22 @@ def fetch_vectorstores_by_user_id(user_id):
     return vectorstores
 
 def delete_vectorstores():
-    st.subheader("Delete Knowledge Base in Database:")
+    st.subheader("Delete VectorStores in Database:")
     user_vectorstores = fetch_vectorstores_by_user_id(st.session_state.user["id"])
     
     if user_vectorstores:
         vectorstore_names = [vs[0] for vs in user_vectorstores]
-        selected_vectorstores = st.multiselect("Select KB to delete:", options=vectorstore_names)
+        selected_vectorstores = st.multiselect("Select vectorstores to delete:", options=vectorstore_names)
         confirm_delete = st.checkbox("I understand that this action cannot be undone.", value=False)
         
-        if st.button("Delete Knowledge Base"):
+        if st.button("Delete VectorStore"):
             if confirm_delete and selected_vectorstores:
                 delete_vectorstores_from_db(selected_vectorstores, st.session_state.user["id"], st.session_state.user["profile_id"])
                 st.success(f"Deleted {len(selected_vectorstores)} vectorstores.")
             else:
                 st.warning("Please confirm the deletion action.")
     else:
-        st.write("No KB found in the database.")
+        st.write("No vectorstores found in the database.")
 
 def delete_vectorstores_from_db(vectorstore_names, user_id, profile):
     conn = sqlite3.connect(WORKING_DATABASE)

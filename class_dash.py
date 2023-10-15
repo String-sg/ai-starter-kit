@@ -180,3 +180,7 @@ def download_data_table_csv(user_id, sch_id, profile):
             file_name=filename,
             mime='text/csv',
         )
+
+# In your Streamlit app:
+# display_data()
+# download_data_table_csv()
