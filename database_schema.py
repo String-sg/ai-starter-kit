@@ -127,6 +127,7 @@ def create_dbs():
             profile_id INTEGER NOT NULL,
             chatbot_ans TEXT,
             user_prompt TEXT,
+			function_name TEXT,
             tokens INTEGER,
 			response_rating INTEGER,
             FOREIGN KEY(user_id) REFERENCES Users(user_id),
@@ -243,8 +244,7 @@ def create_dbs():
             FOREIGN KEY(user_id) REFERENCES Users(user_id)
         )
         ''')
-	
-    #Link vectorestores to profiles
+ #Link vectorestores to profiles
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS Profile_VectorStores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -254,7 +254,8 @@ def create_dbs():
         FOREIGN KEY(vs_id) REFERENCES Vector_Stores(vs_id)
         )
     ''')
-
+	
+    #need to create vectorstores for each app function - new table
 
 
     conn.commit()

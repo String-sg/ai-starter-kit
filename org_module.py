@@ -28,17 +28,13 @@ SUPER = st.secrets["super_admin"]
 STU_PASS = st.secrets["student_password"]
 TCH_PASS = st.secrets["teacher_password"]
 DEFAULT_TEXT = config_handler.get_config_values('constants', 'DEFAULT_TEXT')
-
+STK_PROMPT_TEMPLATES = config_handler.get_config_values('menu_lists', 'STK_PROMPT_TEMPLATES')
 # Fetching constants from config.ini
 TCH = config_handler.get_config_values('constants', 'TCH')
 STU = config_handler.get_config_values('constants', 'STU')
 SA = config_handler.get_config_values('constants', 'SA')
 AD = config_handler.get_config_values('constants', 'AD')
 ALL_ORG = config_handler.get_config_values('constants', 'ALL_ORG')
-MOE = config_handler.get_config_values('constants', 'MOE')
-IDP = config_handler.get_config_values('constants', 'IDP')
-GM = config_handler.get_config_values('constants', 'GM')
-GA = config_handler.get_config_values('constants', 'GA')
 MODE = config_handler.get_config_values('constants', 'MODE')
 SCH_PROFILES = config_handler.get_config_values('menu_lists', 'SCH_PROFILES')
 EDU_ORGS = config_handler.get_config_values('menu_lists', 'EDU_ORGS')
@@ -184,6 +180,8 @@ def display_accounts(school_id):
 
 	return df
 
+
+
 def create_org_structure():
 	with sqlite3.connect(WORKING_DATABASE) as conn:
 		cursor = conn.cursor()
@@ -234,7 +232,7 @@ def create_org_structure():
 
 				conn.commit()
 				st.success("Data inserted successfully!")
-				st.experimental_rerun()
+				st.rerun()
 
 
 def check_multiple_schools():
@@ -242,9 +240,9 @@ def check_multiple_schools():
 		cursor = conn.cursor()
 		cursor.execute("SELECT COUNT(*) FROM Schools")
 		num_schools = cursor.fetchone()[0]
-		if MODE == 2: # MODE 2 is for multiple schools
+		if MODE == 2 and num_schools > 1: # MODE 2 is for multiple schools
 			return False
-		elif num_schools >= 1:# Other MODES is for single school
+		elif num_schools > 1:# Other MODES is for single school
 			return True
 		else:# No schools created yet
 			return False

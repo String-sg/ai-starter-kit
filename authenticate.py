@@ -1,7 +1,30 @@
 import streamlit as st
 import hashlib
+#from st_files_connection import FilesConnection
 import sqlite3
 import os
+import configparser
+import os
+import ast
+class ConfigHandler:
+	def __init__(self):
+		self.config = configparser.ConfigParser()
+		self.config.read('config.ini')
+
+	def get_value(self, section, key):
+		value = self.config.get(section, key)
+		try:
+			# Convert string value to a Python data structure
+			return ast.literal_eval(value)
+		except (SyntaxError, ValueError):
+			# If not a data structure, return the plain string
+			return value
+
+# Initialization
+config_handler = ConfigHandler()
+COTF = config_handler.get_value('constants', 'COTF')
+META = config_handler.get_value('constants', 'META')
+PANDAI = config_handler.get_value('constants', 'PANDAI')
 
 # Create or check for the 'database' directory in the current working directory
 cwd = os.getcwd()
@@ -39,6 +62,7 @@ def check_password(username, password):
 	"""Checks if the password matches the stored password."""
 	hashed_password = hash_password(password)
 	conn = sqlite3.connect(WORKING_DATABASE)
+	#conn = st.experimental_connection('s3', type=FilesConnection)
 	cursor = conn.cursor()
 	
 	# Fetch only the password for the given username
@@ -51,3 +75,6 @@ def check_password(username, password):
 		return True
 	else:
 		return False
+
+def return_api_key():
+	return st.secrets["openai_key"]

@@ -220,6 +220,8 @@ def delete_files():
         st.write("No files found in the database.")
 
 
+
+
 def delete_files_from_db(file_names, user_id, profile):
     conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()

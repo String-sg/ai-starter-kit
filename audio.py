@@ -3,6 +3,7 @@ from st_audiorec import st_audiorec
 import openai
 import whisper
 import tempfile
+from authenticate import return_api_key
 import io
 import os
 # Create or check for the 'database' directory in the current working directory
@@ -23,15 +24,11 @@ if "svg_height" not in st.session_state:
 if "previous_mermaid" not in st.session_state:
 	st.session_state["previous_mermaid"] = ""
 
-if "api_key" not in st.session_state:
-	st.session_state.api_key = False
-	 
-if st.secrets["openai_key"] != "None":
-	st.session_state.api_key  = st.secrets["openai_key"]
-	openai.api_key = st.secrets["openai_key"]
-	os.environ["OPENAI_API_KEY"] = st.secrets["openai_key"]
+
 
 def audio_feedback_bot(prompt, feedback):
+	openai.api_key = return_api_key()
+	os.environ["OPENAI_API_KEY"] = return_api_key()
 	response = openai.ChatCompletion.create(
 		model=st.session_state.openai_model,
 		messages=[
@@ -70,16 +67,25 @@ def record_myself():
 			os.remove(tmpfile.name)  # Delete the temporary file manually after processing
 			return result.text
 
+
 def assessment_prompt(transcript, assessment_type, subject, topic, language):
+	
+	prompt = f"Find relevant sources for {subject} and {topic}."
+	if st.session_state.vs:
+		docs = st.session_state.vs.similarity_search(prompt)
+		ans = docs[0].page_content
+		source = docs[0].metadata.get('source', None)
+
+		search_results = f"""{ans} \n\n Source: ({source})"""
 	# Generate GPT response and feedback based on prompt and assessment type
 	if assessment_type == "Oral Assessment":
-		feedback = f"Provide feedback as a teacher based on the subject {subject} and topic {topic} in {language} on sentence structure and phrasing to help the student sound more proper."
+		feedback = f"Provide feedback as a mentor based on the subject {subject} and topic {topic} in {language} on sentence structure and phrasing to help the user sound more proper. You may refer to this {search_results} for reference."
 	elif assessment_type == "Content Assessment":
-		feedback = f"Provide feedback based as a teacher on the subject {subject} and topic {topic} in {language} on the accuracy and completeness of the content explanation, and correct any errors or misconceptions."
+		feedback = f"Provide feedback based as a mentor on the subject {subject} and topic {topic} in {language} on the accuracy and completeness of the content explanation, and correct any errors or misconceptions.You may refer to this {search_results} for reference."
 	
 	message_placeholder = st.empty()
 	full_response = ""
-	for response in audio_feedback_bot(transcript, feedback):
+	for response in audio_feedback_bot(transcript, feedback + st.session_state.oral_rubrics):
 		full_response += response.choices[0].delta.get("content", "")
 		message_placeholder.markdown(full_response + "▌")
 	message_placeholder.markdown(full_response)
