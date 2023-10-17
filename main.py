@@ -4,8 +4,8 @@ from analytics_dashboard import pandas_ai, download_data
 from streamlit_antd_components import menu, MenuItem
 import streamlit_antd_components as sac
 from main_bot import basebot_memory, basebot_qa_memory, clear_session_states, search_bot, basebot, basebot_qa
-from kb_module import display_files,docs_uploader, delete_files
-from vs_module import display_vectorstores, create_vectorstore, delete_vectorstores
+from files_module import display_files,docs_uploader, delete_files
+from kb_module import display_vectorstores, create_vectorstore, delete_vectorstores
 from authenticate import login_function,check_password
 from class_dash import download_data_table_csv
 from lesson_plan import lesson_collaborator, lesson_commentator, lesson_bot
@@ -112,7 +112,7 @@ def main():
 			st.session_state.title_page = DEFAULT_TITLE 
 
 		st.title(st.session_state.title_page)
-		sac.divider(label='ETD & ITD MOE Project', icon='house', align='center', direction='horizontal', dashed=False, bold=False)
+		sac.divider(label='A String initiative', icon='house', align='center', direction='horizontal', dashed=False, bold=False)
 		
 		if "api_key" not in st.session_state:
 			st.session_state.api_key = ""
