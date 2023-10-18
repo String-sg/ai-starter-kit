@@ -1,9 +1,16 @@
 import streamlit as st
 import sqlite3
+import streamlit_antd_components as sac
 import pandas as pd
 import os
-import tempfile
-#from langchain.embeddings.openai import OpenAIEmbeddings
+import openai
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.document_loaders import UnstructuredFileLoader
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import LanceDB
+from authenticate import return_api_key
+import lancedb  
+import pickle
 import configparser
 import ast
 
@@ -28,6 +35,7 @@ SA = config_handler.get_config_values('constants', 'SA')
 AD = config_handler.get_config_values('constants', 'AD')
 
 
+
 # Create or check for the 'database' directory in the current working directory
 cwd = os.getcwd()
 WORKING_DIRECTORY = os.path.join(cwd, "database")
@@ -40,22 +48,22 @@ if st.secrets["sql_ext_path"] == "None":
 else:
 	WORKING_DATABASE= st.secrets["sql_ext_path"]
 
-def fetch_files_with_usernames():
+def fetch_vectorstores_with_usernames():
     conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
     
     query = '''
     SELECT 
-        Files.file_id, 
+        Vector_Stores.vs_id, 
         Subject.subject_name,
         Topic.topic_name, 
-        Files.file_name, 
+        Vector_Stores.vectorstore_name, 
         Users.username, 
-        Files.sharing_enabled
-    FROM Files
-    JOIN Users ON Files.user_id = Users.user_id
-    LEFT JOIN Subject ON Files.subject = Subject.id
-    LEFT JOIN Topic ON Files.topic = Topic.id;
+        Vector_Stores.sharing_enabled
+    FROM Vector_Stores
+    JOIN Users ON Vector_Stores.user_id = Users.user_id
+    LEFT JOIN Subject ON Vector_Stores.subject = Subject.id
+    LEFT JOIN Topic ON Vector_Stores.topic = Topic.id;
     '''
     
     cursor.execute(query)
@@ -63,9 +71,9 @@ def fetch_files_with_usernames():
     conn.close()
     return data
 
-def display_files():
-    data = fetch_files_with_usernames()
-    df = pd.DataFrame(data, columns=["file_id", "subject_name", "topic_name", "file_name", "username", "sharing_enabled"])
+def display_vectorstores():
+    data = fetch_vectorstores_with_usernames()
+    df = pd.DataFrame(data, columns=["vs_id", "subject_name", "topic_name", "vectorstore_name", "username", "sharing_enabled"])
 
     # Convert the 'sharing_enabled' values
     df["sharing_enabled"] = df["sharing_enabled"].apply(lambda x: '✔' if x == 1 else '')
@@ -73,46 +81,110 @@ def display_files():
     st.dataframe(
         df, 
         use_container_width=True,
-        column_order=["file_id", "subject_name", "topic_name", "file_name", "username", "sharing_enabled"]
+        column_order=["vs_id", "subject_name", "topic_name", "vectorstore_name", "username", "sharing_enabled"]
     )
 
-def get_file_extension(file_name):
-	return os.path.splitext(file_name)[1]
-
-def save_file_to_db(user_id, file_name, file_content, metadata, subject, topic, sharing_enabled):
+def fetch_all_files():
+    """
+    Fetch all files either shared or based on user type
+    """
     conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
-    extension = get_file_extension(file_name)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temp_file:
-        temp_file.write(file_content)
-        temp_file.flush()
-
-    # Check if the subject already exists. If not, insert it.
-    cursor.execute('SELECT id FROM Subject WHERE subject_name = ?', (subject,))
-    subject_id_result = cursor.fetchone()
-    if not subject_id_result:
-        cursor.execute('INSERT INTO Subject (org_id, subject_name) VALUES (?, ?)', (st.session_state.user["org_id"], subject))
-        subject_id = cursor.lastrowid
+    
+    # Construct the SQL query with JOINs for Subject, Topic, and Users tables
+    if st.session_state.user['profile_id'] == 'SA':
+        cursor.execute('''
+            SELECT Files.file_id, Files.file_name, Subject.subject_name, Topic.topic_name, Users.username 
+            FROM Files 
+            JOIN Subject ON Files.subject = Subject.id 
+            JOIN Topic ON Files.topic = Topic.id 
+            JOIN Users ON Files.user_id = Users.user_id
+        ''')
     else:
-        subject_id = subject_id_result[0]
-
-    # Check if the topic already exists. If not, insert it.
-    cursor.execute('SELECT id FROM Topic WHERE topic_name = ?', (topic,))
-    topic_id_result = cursor.fetchone()
-    if not topic_id_result:
-        cursor.execute('INSERT INTO Topic (org_id, topic_name) VALUES (?, ?)', (st.session_state.user["org_id"], topic))
-        topic_id = cursor.lastrowid
-    else:
-        topic_id = topic_id_result[0]
-
-    # Insert the file data and metadata into the Files table
-    cursor.execute(
-        'INSERT INTO Files (user_id, file_name, data, metadata, subject, topic, sharing_enabled) VALUES (?, ?, ?, ?, ?, ?, ?);', 
-        (user_id, file_name, temp_file.name,metadata, subject_id, topic_id, int(sharing_enabled))
-    )
-    conn.commit()
+        cursor.execute('''
+            SELECT Files.file_id, Files.file_name, Subject.subject_name, Topic.topic_name, Users.username 
+            FROM Files 
+            JOIN Subject ON Files.subject = Subject.id 
+            JOIN Topic ON Files.topic = Topic.id 
+            JOIN Users ON Files.user_id = Users.user_id 
+            WHERE Files.sharing_enabled = 1
+        ''')
+    
+    files = cursor.fetchall()
+    formatted_files = [f"({file[0]}) {file[1]} ({file[4]})" for file in files]
+    
     conn.close()
+    return formatted_files
 
+
+def fetch_file_data(file_id):
+    """
+    Fetch file data given a file id
+    """
+    conn = sqlite3.connect(WORKING_DATABASE)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT data, metadata FROM Files WHERE file_id = ?", (file_id,))
+    data = cursor.fetchone()
+
+    conn.close()
+    if data:
+        return data[0], data[1]
+    else:
+        return None, None
+
+def insert_topic(org_id, topic_name):
+    conn = sqlite3.connect(WORKING_DATABASE)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('INSERT INTO Topic (org_id, topic_name) VALUES (?, ?);', (org_id, topic_name))
+        conn.commit()
+        return True  # Indicates successful insertion
+    except sqlite3.IntegrityError:
+        # IntegrityError occurs if topic_name is not unique within the org
+        return False  # Indicates topic_name is not unique within the org
+    finally:
+        conn.close()
+
+def insert_subject(org_id, subject_name):
+    conn = sqlite3.connect(WORKING_DATABASE)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('INSERT INTO Subject (org_id, subject_name) VALUES (?, ?);', (org_id, subject_name))
+        conn.commit()
+        return True  # Indicates successful insertion
+    except sqlite3.IntegrityError:
+        # IntegrityError occurs if subject_name is not unique within the org
+        return False  # Indicates subject_name is not unique within the org
+    finally:
+        conn.close()
+
+def select_organization():
+    with sqlite3.connect(WORKING_DATABASE) as conn:
+        cursor = conn.cursor()
+
+        # Org selection
+        org_query = "SELECT org_name FROM Organizations"
+        cursor.execute(org_query)
+        orgs = cursor.fetchall()
+        org_names = [org[0] for org in orgs]
+
+        # Use a Streamlit selectbox to choose an organization
+        selected_org_name = st.selectbox("Select an organization:", org_names)
+
+        # Retrieve the org_id for the selected organization
+        cursor.execute('SELECT org_id FROM Organizations WHERE org_name = ?;', (selected_org_name,))
+        result = cursor.fetchone()
+
+        if result:
+            org_id = result[0]
+            st.write(f"The org_id for {selected_org_name} is {org_id}.")
+            return org_id
+        else:
+            st.write(f"Organization '{selected_org_name}' not found in the database.")
+            return None
 
 
 def fetch_subjects_by_org(org_id):
@@ -129,7 +201,6 @@ def fetch_subjects_by_org(org_id):
     conn.close()
     return subjects
 
-
 def fetch_topics_by_org(org_id):
     conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
@@ -144,12 +215,101 @@ def fetch_topics_by_org(org_id):
     conn.close()
     return topics
 
-def docs_uploader():
-    st.subheader("Upload Files to build your knowledge base")
+def split_docs(file_path,meta):
+#def split_meta_docs(file, source, tch_code):
+	loader = UnstructuredFileLoader(file_path)
+	documents = loader.load()
+	text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+	docs = text_splitter.split_documents(documents)
+	metadata = {"source": meta}
+	for doc in docs:
+		doc.metadata.update(metadata)
+	return docs
+
+def create_lancedb_table(embeddings, meta, table_name):
+	lancedb_path = os.path.join(WORKING_DIRECTORY, "lancedb")
+	# LanceDB connection
+	db = lancedb.connect(lancedb_path)
+	table = db.create_table(
+		f"{table_name}",
+		data=[
+			{
+				"vector": embeddings.embed_query("Query Unsuccessful"),
+				"text": "Query Unsuccessful",
+				"id": "1",
+				"source": f"{meta}"
+			}
+		],
+		mode="overwrite",	
+	)
+	return table
+
+def save_to_vectorstores(vs, vstore_input_name, subject, topic, username, share_resource=False):
+    conn = sqlite3.connect(WORKING_DATABASE)
+    cursor = conn.cursor()
+
+    # Fetch the user's details
+    cursor.execute('SELECT user_id FROM Users WHERE username = ?', (username,))
+    user_details = cursor.fetchone()
+
+    if not user_details:
+        st.error("Error: User not found.")
+        return
+
+    user_id = user_details[0]
+
+    # If Vector_Store instance exists in session state, then serialize and save
+    if vs:
+        serialized_db = pickle.dumps(vs)
+
+        # Check if the entry already exists
+        cursor.execute('SELECT 1 FROM Vector_Stores WHERE vectorstore_name LIKE ? AND user_id = ?', (f"%{vstore_input_name}%", user_id))
+        exists = cursor.fetchone()
+
+        if exists:
+            st.error("Error: An entry with the same vectorstore_name and user_id already exists.")
+            return
+        
+        if subject is None:
+            st.error("Error: Subject is missing.")
+            return
+
+        if topic is None:
+            st.error("Error: Topic is missing.")
+            return
+
+        # Get the subject and topic IDs
+        cursor.execute('SELECT id FROM Subject WHERE subject_name = ?', (subject,))
+        subject_id = cursor.fetchone()[0]
+
+        cursor.execute('SELECT id FROM Topic WHERE topic_name = ?', (topic,))
+        topic_id = cursor.fetchone()[0]
+
+        # Insert the new row
+        cursor.execute('''
+        INSERT INTO Vector_Stores (vectorstore_name, data, user_id, subject, topic, sharing_enabled)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (vstore_input_name, serialized_db, user_id, subject_id, topic_id, share_resource))
+
+        conn.commit()
+
+        
+
+    conn.close()
+
+def create_vectorstore():
+    openai.api_key = return_api_key()
+    os.environ["OPENAI_API_KEY"] = return_api_key()
+    full_docs = []
+    st.subheader("Enter the topic and subject for your knowledge base")
+    embeddings = OpenAIEmbeddings()
+    if st.session_state.user['profile_id'] == SA:
+        org_id = select_organization()
+        if org_id is None:
+            return
+    else:
+        org_id = st.session_state.user["org_id"]
     
-    # Upload the file using Streamlit
-    uploaded_file = st.file_uploader("Choose a file", type=['docx', 'txt', 'pdf'])
-    meta = st.text_input("Please enter your document source (Default is MOE):", max_chars=20)
 
     # Fetch all available subjects
     subjects = fetch_subjects_by_org(st.session_state.user["org_id"])
@@ -157,9 +317,12 @@ def docs_uploader():
     selected_subject = st.selectbox("Select an existing subject or type a new one:", options=subject_names + ['New Subject'])
     
     if selected_subject == 'New Subject':
-        new_subject = st.text_input("Please enter the new subject name:", max_chars=30)
+        subject = st.text_input("Please enter the new subject name:", max_chars=30)
+        if subject:
+            insert_subject(org_id, subject)
+
     else:
-        new_subject = None
+        subject = selected_subject
 
     # Fetch all available topics
     topics = fetch_topics_by_org(st.session_state.user["org_id"])
@@ -167,78 +330,102 @@ def docs_uploader():
     selected_topic = st.selectbox("Select an existing topic or type a new one:", options=topic_names + ['New Topic'])
     
     if selected_topic == 'New Topic':
-        new_topic = st.text_input("Please enter the new topic name:", max_chars=30)
+        topic = st.text_input("Please enter the new topic name:", max_chars=30)
+        if topic:
+            insert_topic(org_id, topic)
     else:
-        new_topic = None
+        topic = selected_topic
     
-    share_resource = st.checkbox("Share this resource", value=True)
+    vectorstore_input = st.text_input("Please type in a name for your knowledge base:", max_chars=20)
+    vs_name = vectorstore_input + f"_({st.session_state.user['username']})"
+    share_resource = st.checkbox("Share this resource", value=True)  # <-- Added this line
 
-    if uploaded_file:
-        st.write("File:", uploaded_file.name, "uploaded!")
-        if not meta:
-            meta = "MOE"
-
-        # Save to Database Button
-        if st.button("Save to Database"):
-            save_file_to_db(
-                user_id=st.session_state.user["id"],
-                file_name=uploaded_file.name,
-                file_content=uploaded_file.read(),
-                metadata=meta,
-                subject=selected_subject if not new_subject else new_subject,
-                topic=selected_topic if not new_topic else new_topic,
-                sharing_enabled=share_resource
-            )
-            st.success("File saved to database!")
-
-def fetch_files_by_user_id(user_id):
-    conn = sqlite3.connect(WORKING_DATABASE)
-    cursor = conn.cursor()
-    
-    # Fetch files based on user_id
-    cursor.execute('SELECT file_name FROM Files WHERE user_id = ?;', (user_id,))
-    
-    files = cursor.fetchall()
-    conn.close()
-    return files
-
-def delete_files():
-    st.subheader("Delete Files in Database:")
-    user_files = fetch_files_by_user_id(st.session_state.user["id"])
-    if user_files:
-        file_names = [file[0] for file in user_files]
-        selected_files = st.multiselect("Select files to delete:", options=file_names)
-        confirm_delete = st.checkbox("I understand that this action cannot be undone.", value=False)
+    # Show the current build of files for the latest database
+    st.subheader("Select one or more files to build your knowledge base")
+    files = fetch_all_files()
+    if files:
+        selected_files = sac.transfer(items=files, label=None, index=None, titles=['Uploaded files', 'Select files for KB'], format_func='title', width='100%', height=None, search=True, pagination=False, oneway=False, reload=True, disabled=False, return_index=False)
         
-        if st.button("Delete"):
-            if confirm_delete and selected_files:
-                delete_files_from_db(selected_files, st.session_state.user["id"], st.session_state.user["profile_id"])
-                st.success(f"Deleted {len(selected_files)} files.")
-            else:
-                st.warning("Please confirm the deletion action.")
+        # Alert to confirm the creation of knowledge base
+        st.warning("Building your knowledge base will take some time. Please be patient.")
+        
+        build = sac.buttons([
+            dict(label='Build VectorStore', icon='check-circle-fill', color = 'green'),
+            dict(label='Cancel', icon='x-circle-fill', color='red'),
+        ], label=None, index=1, format_func='title', align='center', position='top', size='default', direction='horizontal', shape='round', type='default', compact=False, return_index=False)
+        
+        if build == 'Build VectorStore' and selected_files:
+            for s_file in selected_files:
+                file_id = int(s_file.split("(", 1)[1].split(")", 1)[0])
+                file_data, meta = fetch_file_data(file_id)
+                docs = split_docs(file_data, meta)
+                full_docs.extend(docs)
+        
+            
+            db = LanceDB.from_documents(full_docs, OpenAIEmbeddings(), connection=create_lancedb_table(embeddings, meta, vs_name)) 
+            save_to_vectorstores(db, vs_name, subject, topic, st.session_state.user["username"], share_resource)  # Passing the share_resource to the function
+            st.success("Knowledge Base loaded")
+
     else:
         st.write("No files found in the database.")
 
 
+def delete_lancedb_table(table_name):
+	lancedb_path = os.path.join(WORKING_DIRECTORY, "lancedb")
+	# LanceDB connection
+	db = lancedb.connect(lancedb_path)
+	db.drop_table(f"{table_name}")
 
+def fetch_vectorstores_by_user_id(user_id):
+    conn = sqlite3.connect(WORKING_DATABASE)
+    cursor = conn.cursor()
+    
+    # Fetch vectorstores based on user_id
+    cursor.execute('SELECT vectorstore_name FROM Vector_Stores WHERE user_id = ?;', (user_id,))
+    
+    vectorstores = cursor.fetchall()
+    conn.close()
+    return vectorstores
 
-def delete_files_from_db(file_names, user_id, profile):
+def delete_vectorstores():
+    st.subheader("Delete VectorStores in Database:")
+    user_vectorstores = fetch_vectorstores_by_user_id(st.session_state.user["id"])
+    
+    if user_vectorstores:
+        vectorstore_names = [vs[0] for vs in user_vectorstores]
+        selected_vectorstores = st.multiselect("Select vectorstores to delete:", options=vectorstore_names)
+        confirm_delete = st.checkbox("I understand that this action cannot be undone.", value=False)
+        
+        if st.button("Delete VectorStore"):
+            if confirm_delete and selected_vectorstores:
+                delete_vectorstores_from_db(selected_vectorstores, st.session_state.user["id"], st.session_state.user["profile_id"])
+                st.success(f"Deleted {len(selected_vectorstores)} vectorstores.")
+            else:
+                st.warning("Please confirm the deletion action.")
+    else:
+        st.write("No vectorstores found in the database.")
+
+def delete_vectorstores_from_db(vectorstore_names, user_id, profile):
     conn = sqlite3.connect(WORKING_DATABASE)
     cursor = conn.cursor()
 
-    if profile in [SA, AD]:
-        # Delete files irrespective of the user_id associated with them
-        for file_name in file_names:
-            cursor.execute('DELETE FROM Files WHERE file_name=?;', (file_name,))
-    else:
-        for file_name in file_names:
-            cursor.execute('DELETE FROM Files WHERE file_name=? AND user_id=?;', (file_name, user_id))
+    for vectorstore_name in vectorstore_names:
+        if profile in ['SA', 'AD']:
+            # Delete the corresponding LanceDB table
+            delete_lancedb_table(vectorstore_name)
+            
+            # Delete vectorstore irrespective of the user_id associated with them
+            cursor.execute('DELETE FROM Vector_Stores WHERE vectorstore_name=?;', (vectorstore_name,))
+        else:
+            # Delete the corresponding LanceDB table
+            delete_lancedb_table(vectorstore_name)
+            
+            # Delete only if the user_id matches
+            cursor.execute('DELETE FROM Vector_Stores WHERE vectorstore_name=? AND user_id=?;', (vectorstore_name, user_id))
             
             # Check if the row was affected
             if cursor.rowcount == 0:
-                st.error(f"Unable to delete file '{file_name}' that is not owned by you.")
+                st.error(f"Unable to delete vectorstore '{vectorstore_name}' that is not owned by you.")
                 
     conn.commit()  # Commit the changes
     conn.close()  # Close the connection
-
-
