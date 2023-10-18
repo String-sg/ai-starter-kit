@@ -1,50 +1,50 @@
-#No need SQLite
+# No need SQLite
 import streamlit as st
 from analytics_dashboard import pandas_ai, download_data
 from streamlit_antd_components import menu, MenuItem
 import streamlit_antd_components as sac
 from main_bot import basebot_memory, basebot_qa_memory, clear_session_states, search_bot, basebot, basebot_qa
-from files_module import display_files,docs_uploader, delete_files
-from kb_module import display_vectorstores, create_vectorstore, delete_vectorstores
-from authenticate import login_function,check_password
+from kb_module import display_files, docs_uploader, delete_files
+from vs_module import display_vectorstores, create_vectorstore, delete_vectorstores
+from authenticate import login_function, check_password
 from class_dash import download_data_table_csv
 from lesson_plan import lesson_collaborator, lesson_commentator, lesson_bot
-#New schema move function fom settings
+# New schema move function fom settings
 from database_schema import create_dbs
 from database_module import manage_tables, delete_tables
 from org_module import (
-	has_at_least_two_rows,
-	initialise_admin_account,
-	load_user_profile,
-	display_accounts,
-	create_org_structure,
-	check_multiple_schools,
-	process_user_profile,
-	remove_or_reassign_teacher_ui,
-	reassign_student_ui,
-	change_teacher_profile_ui
+    has_at_least_two_rows,
+    initialise_admin_account,
+    load_user_profile,
+    display_accounts,
+    create_org_structure,
+    check_multiple_schools,
+    process_user_profile,
+    remove_or_reassign_teacher_ui,
+    reassign_student_ui,
+    change_teacher_profile_ui
 )
 from pwd_module import reset_passwords, password_settings
 from users_module import (
-	link_users_to_app_function_ui,
-	set_function_access_for_user,
-	create_prompt_template,
-	update_prompt_template,
-	vectorstore_selection_interface,
-	pre_load_variables,
-	load_and_fetch_vectorstore_for_user,
-	link_profiles_to_vectorstore_interface
+    link_users_to_app_function_ui,
+    set_function_access_for_user,
+    create_prompt_template,
+    update_prompt_template,
+    vectorstore_selection_interface,
+    pre_load_variables,
+    load_and_fetch_vectorstore_for_user,
+    link_profiles_to_vectorstore_interface
 )
 from k_map import (
-	map_prompter, 
-	generate_mindmap,
-	map_creation_form, 
-	map_prompter_with_plantuml_form, 
-	generate_plantuml_mindmap, 
-	render_diagram,
-	output_mermaid_diagram
+    map_prompter,
+    generate_mindmap,
+    map_creation_form,
+    map_prompter_with_plantuml_form,
+    generate_plantuml_mindmap,
+    render_diagram,
+    output_mermaid_diagram
 )
-from audio import record_myself,assessment_prompt
+from audio import record_myself, assessment_prompt
 from bot_settings import bot_settings_interface, load_bot_settings
 from PIL import Image
 import configparser
@@ -52,19 +52,21 @@ import os
 import ast
 from metacog import science_feedback, reflective_peer
 
-class ConfigHandler:
-	def __init__(self):
-		self.config = configparser.ConfigParser()
-		self.config.read('config.ini')
 
-	def get_value(self, section, key):
-		value = self.config.get(section, key)
-		try:
-			# Convert string value to a Python data structure
-			return ast.literal_eval(value)
-		except (SyntaxError, ValueError):
-			# If not a data structure, return the plain string
-			return value
+class ConfigHandler:
+    def __init__(self):
+        self.config = configparser.ConfigParser()
+        self.config.read('config.ini')
+
+    def get_value(self, section, key):
+        value = self.config.get(section, key)
+        try:
+            # Convert string value to a Python data structure
+            return ast.literal_eval(value)
+        except (SyntaxError, ValueError):
+            # If not a data structure, return the plain string
+            return value
+
 
 # Initialization
 config_handler = ConfigHandler()
@@ -98,13 +100,15 @@ CONVERSATION = config_handler.get_value('constants', 'CONVERSATION')
 MINDMAP = config_handler.get_value('constants', 'MINDMAP')
 METACOG = config_handler.get_value('constants', 'METACOG')
 
+
 def is_function_disabled(function_name):
-	return st.session_state.func_options.get(function_name, True)
+    return st.session_state.func_options.get(function_name, True)
 
 
-def initialize_session_state( menu_funcs, default_value):
-	st.session_state.func_options = {key: default_value for key in menu_funcs.keys()}
-	
+def initialize_session_state(menu_funcs, default_value):
+    st.session_state.func_options = {
+        key: default_value for key in menu_funcs.keys()}
+
 
 def main():
 	try:
@@ -493,4 +497,12 @@ def main():
 		st.exception(e)
 
 if __name__ == "__main__":
-	main()
+    main()
+
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)

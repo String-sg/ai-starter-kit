@@ -2,3 +2,4 @@
 maxUploadSize = 2
 [theme]
 base="dark"
+primaryColor="#75F8CC"

@@ -29,12 +29,18 @@ You can fork it at streamlit community cloud, it can be used straight away, just
 > [!IMPORTANT]  
 > The following env variables are required for setup. You can add this to the `secrets.toml` file in your streamlit deployment 
 ```
-openai_key = "XXXXXXX_YOUR_API_KEY"
+openai_key = “XXX”
 default_db = "chergpt.db"
-default_temp = 0
+default_temp = 0.0
 default_frequency_penalty = 0.0
 default_presence_penalty = 0.0
 default_model = "gpt-4"
+default_password = "default_password"
+student_password = "studentp@sswrd"
+teacher_password = "teacherp@sswrd"
+super_admin_password = "anything"
+super_admin = "super_admin"
+default_title = "Starter Kit"
 sql_ext_path = "None"
 ```
 *Note, even though gpt-4 is the default model, you can also change the default model to:<br>
