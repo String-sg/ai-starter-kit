@@ -1,4 +1,6 @@
 # No need SQLite
+from files_module import delete_files, display_files, docs_uploader
+from kb_module import delete_vectorstores, display_vectorstores
 import streamlit as st
 from analytics_dashboard import pandas_ai, download_data
 from streamlit_antd_components import menu, MenuItem
@@ -174,8 +176,7 @@ def main():
         create_dbs()
         initialise_admin_account()
         with st.sidebar:
-            # KH: let's refactor this to a physical toggle instead of manually switching - definitely will cause accidental styling changes otherwise
-            # options for sidebar
+            # KH: let's refactor this to a physical toggle instead of manually switching - definitely will cause accidental styling changes
             # if st.session_state.login == False:
             # 	image = Image.open('cotf_logo.png')
             # 	st.image(image)
@@ -189,12 +190,14 @@ def main():
             else:
                 image = Image.open('primary_green.png')
                 st.image(image)
+                # super admin login feature
                 if st.session_state.user['profile_id'] == SA:
+                    # Initialize the session state for function options
                     initialize_session_state(MENU_FUNCS, False)
                 else:
-
                     set_function_access_for_user(st.session_state.user['id'])
                     # Using the is_function_disabled function for setting the `disabled` attribute
+
                 st.session_state.option = sac.menu([
                     sac.MenuItem('Home', icon='house', children=[
                         sac.MenuItem('Personal Dashboard', icon='person-circle',
@@ -270,6 +273,7 @@ def main():
             else:
                 download_data_table_csv(
                     st.session_state.user["id"], st.session_state.user["school_id"], st.session_state.user["profile_id"])
+            display_vectorstores()
             vectorstore_selection_interface(st.session_state.user['id'])
         elif st.session_state.option == 'Analytics Dashboard':
             st.subheader(f":green[{st.session_state.option}]")
