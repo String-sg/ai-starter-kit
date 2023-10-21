@@ -1,6 +1,6 @@
 # No need SQLite
 from files_module import delete_files, display_files, docs_uploader
-from kb_module import delete_vectorstores, display_vectorstores
+from kb_module import create_vectorstore, delete_vectorstores, display_vectorstores
 import streamlit as st
 from analytics_dashboard import pandas_ai, download_data
 from streamlit_antd_components import menu, MenuItem
@@ -73,9 +73,6 @@ class ConfigHandler:
 # Initialization
 config_handler = ConfigHandler()
 
-# Setting Streamlit configurations
-st.set_page_config(layout="wide")
-
 # Fetching secrets from Streamlit
 DEFAULT_TITLE = st.secrets["default_title"]
 SUPER_PWD = st.secrets["super_admin_password"]
@@ -101,6 +98,17 @@ REFLECTIVE = config_handler.get_value('constants', 'REFLECTIVE')
 CONVERSATION = config_handler.get_value('constants', 'CONVERSATION')
 MINDMAP = config_handler.get_value('constants', 'MINDMAP')
 METACOG = config_handler.get_value('constants', 'METACOG')
+
+
+# Path Variables
+faviconPath = "./images/favicon.png"
+
+st.set_page_config(
+    page_title='CherGPT Starter Kit',
+    page_icon=faviconPath,
+    layout='wide',
+    initial_sidebar_state="expanded"
+)
 
 
 def is_function_disabled(function_name):
@@ -245,7 +253,6 @@ def main():
 
         if st.session_state.option == 'Users login':
             if login_function() == True:
-                placeholder2.empty()
                 st.session_state.login = True
                 st.session_state.user = load_user_profile(
                     st.session_state.user)
@@ -277,6 +284,8 @@ def main():
         # Lesson Assistant
         elif st.session_state.option == "Lesson Generator":
             st.subheader(f":green[{st.session_state.option}]")
+            st.info(
+                'Easily create lesson plans informed by epedagogy', icon="ℹ️")
             prompt = lesson_collaborator()
             if prompt:
                 lesson_bot(
@@ -469,6 +478,8 @@ def main():
 
         elif st.session_state.option == "Knowledge Map Generator":
             st.subheader(f":green[{st.session_state.option}]")
+            st.info(
+                'Create mindmap/ concept maps/ process maps quickly with the help of AI', icon="ℹ️")
             mode = sac.switch(label='Generative Mode :', value=True, checked='Coloured Map',
                               unchecked='Process Chart', align='center', position='left', size='default', disabled=False)
             subject, topic, levels = map_creation_form()
@@ -482,7 +493,7 @@ def main():
             if prompt:
                 with st.spinner("Generating mindmap"):
                     st.write(
-                        f"Mindmap generated from the prompt: :orange[**{subject} {topic} {levels}**]")
+                        f"Mindmap generated from the prompt: :orange[**{subject} {topic} ({levels} levels) **]")
                     if mode:
                         uml = generate_plantuml_mindmap(prompt)
                         image = render_diagram(uml)
