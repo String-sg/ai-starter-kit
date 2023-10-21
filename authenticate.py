@@ -43,20 +43,11 @@ else:
     WORKING_DATABASE = st.secrets["sql_ext_path"]
 
 
-def login_function(prcnt_width: int = 75):
-    max_width_str = f"max-width: {prcnt_width}%;"
-    st.markdown(f""" 
-                <style> 
-                .reportview-container .main .block-container{{{max_width_str}}}
-                </style>    
-                """,
-                unsafe_allow_html=True,
-                )
+def login_function():
     with st.form("Student login"):
         username = st.text_input("Username", max_chars=20)
         password = st.text_input("Password", type="password", max_chars=16)
         submit_button = st.form_submit_button("Login")
-        # On submit, check if new passwords match and then update the password.
         if submit_button:
             if check_password(username, password):
                 st.session_state.user = username
