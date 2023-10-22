@@ -42,6 +42,10 @@ super_admin_password = "anything"
 super_admin = "super_admin"
 default_title = "Starter Kit"
 sql_ext_path = "None"
+[AWS]
+AWS_ACCESS_KEY_ID = "XXX"
+AWS_SECRET_ACCESS_KEY = "XXX"
+AWS_DEFAULT_REGION = "XXX"
 ```
 *Note, even though gpt-4 is the default model, you can also change the default model to:<br>
 `default_model = gpt-3.5-turbo`

@@ -173,3 +173,168 @@ def link_users_to_app_function_ui(school_id):
 
             conn.commit()
             st.success(f"Users matching the filter have been linked to selected app functions successfully!")
+
+def zip_directory(directory, output_filename):
+    with zipfile.ZipFile(output_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for foldername, subfolders, filenames in os.walk(directory):
+            for filename in filenames:
+                absolute_path = os.path.join(foldername, filename)
+                relative_path = absolute_path[len(directory) + len(os.sep):]  # Zip won't contain absolute path
+                zipf.write(absolute_path, relative_path)
+
+def unzip_file(zip_path, extract_to):
+    """
+    Unzip the file to the specified directory.
+    """
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_to)
+
+def download_database():
+    if st.button("Download Database"):
+        zip_directory(WORKING_DIRECTORY, 'database.zip')
+        st.write('Folder zipped successfully!')
+        
+        try:
+            with open('database.zip', 'rb') as file:
+                data_zip = file.read()
+        except:
+            st.error("Failed to export database, please try again")
+        else:
+            st.success("Database is ready for downloading")
+            st.download_button(
+                label="Download zipped folder",
+                data=data_zip,
+                file_name='database.zip',
+                mime='application/zip',
+            )
+
+def upload_database():
+    uploaded_file = st.file_uploader("Upload Files", type=['zip'])
+    if uploaded_file is not None:
+        with open("temp.zip", "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        unzip_file("temp.zip", WORKING_DIRECTORY)
+        st.write('File unzipped successfully to', WORKING_DIRECTORY)
+
+def upload_to_s3(file_name, bucket, s3_file_name):
+    s3 = boto3.client('s3',
+                      region_name=st.secrets["AWS"]["AWS_DEFAULT_REGION"],
+                      aws_access_key_id=st.secrets["AWS"]["AWS_ACCESS_KEY_ID"],
+                      aws_secret_access_key=st.secrets["AWS"]["AWS_SECRET_ACCESS_KEY"])
+    s3.upload_file(file_name, bucket, s3_file_name)
+
+def download_from_s3(bucket, s3_file_name, local_file_name):
+    s3 = boto3.client('s3',
+                      region_name=st.secrets["AWS"]["AWS_DEFAULT_REGION"],
+                      aws_access_key_id=st.secrets["AWS"]["AWS_ACCESS_KEY_ID"],
+                      aws_secret_access_key=st.secrets["AWS"]["AWS_SECRET_ACCESS_KEY"])
+    s3.download_file(bucket, s3_file_name, local_file_name)
+
+def upload_s3_database():
+    if st.button('Upload Database to S3'):
+        cwd = os.getcwd()
+        DB_ZIP_DIRECTORY = os.path.join(cwd, "database.zip")
+        zip_directory('database', 'database.zip')
+        st.write('Folder zipped successfully!')
+        #st.download_button(label='Download zipped folder', data=open('database.zip', 'rb'), file_name='database.zip')
+        upload_to_s3('database.zip', 'moebotsqldb', DB_ZIP_DIRECTORY)
+        st.write('Uploaded to S3 successfully!')
+
+
+def backup_s3_database():
+    cwd = os.getcwd()
+    DB_ZIP_DIRECTORY = os.path.join(cwd, "database.zip")
+    zip_directory('database', 'database.zip')
+    st.write('Folder zipped successfully!')
+    #st.download_button(label='Download zipped folder', data=open('database.zip', 'rb'), file_name='database.zip')
+    upload_to_s3('database.zip', 'moebotsqldb', DB_ZIP_DIRECTORY)
+    st.write('Uploaded to S3 successfully!')
+
+# # New function to handle downloading from S3 and unzipping
+# def download_from_s3_and_unzip():
+#     if st.button('Download Database from S3 and Unzip'):
+#         cwd = os.getcwd()
+#         DB_ZIP_DIRECTORY = os.path.join(cwd, "database.zip")
+        
+#         # Downloading
+#         download_from_s3('moebotsqldb', DB_ZIP_DIRECTORY, 'database.zip')
+#         st.write('Downloaded from S3 successfully!')
+        
+#         # Unzipping
+#         unzip_file('database.zip', 'database')
+#         st.write('Unzipped successfully!')
+
+
+def download_from_s3_and_unzip():
+    if st.button('Download Database from S3 and Unzip'):
+        cwd = os.getcwd()
+        DB_ZIP_DIRECTORY = os.path.join(cwd, "database.zip")
+        
+        # Downloading
+        download_from_s3('moebotsqldb', DB_ZIP_DIRECTORY, 'database.zip')
+        st.write('Downloaded from S3 successfully!')
+
+        with st.spinner("Unzipping..."):
+
+            # Wait for a few seconds to ensure the file exists
+            time_to_wait = 3  # seconds
+            for _ in range(time_to_wait):
+                if os.path.exists(DB_ZIP_DIRECTORY):
+                    break
+                time.sleep(1)
+
+            # Proceed with unzipping if file exists
+            if os.path.exists(DB_ZIP_DIRECTORY):
+                # Unzipping
+                unzip_file('database.zip', 'database')
+                st.write('Unzipped successfully!')
+            else:
+                st.warning('File not found. Please try again.')
+
+def download_from_s3_and_unzip():
+    if st.button('Download Database from S3 and Unzip'):
+        cwd = os.getcwd()
+        DB_ZIP_DIRECTORY = os.path.join(cwd, "database.zip")
+        
+        # Downloading
+        download_from_s3('moebotsqldb', DB_ZIP_DIRECTORY, 'database.zip')
+        st.write('Downloaded from S3 successfully!')
+
+        # Wait for a few seconds to ensure the file exists
+        time_to_wait = 5  # seconds
+        for _ in range(time_to_wait):
+            if os.path.exists(DB_ZIP_DIRECTORY):
+                break
+            time.sleep(1)
+
+        # Proceed with unzipping if file exists
+        if os.path.exists(DB_ZIP_DIRECTORY):
+            # Unzipping
+            unzip_file('database.zip', 'database')
+            st.write('Unzipped successfully!')
+        else:
+            st.warning('File not found. Please try again.')
+
+def check_aws_secrets_exist():
+    try:
+        # Check if all required AWS secrets are available
+        if "AWS" in st.secrets and \
+           "AWS_DEFAULT_REGION" in st.secrets["AWS"] and \
+           "AWS_ACCESS_KEY_ID" in st.secrets["AWS"] and \
+           "AWS_SECRET_ACCESS_KEY" in st.secrets["AWS"]:
+            return True
+        else:
+            return False
+    except Exception as e:
+        st.warning(f"Error checking AWS secrets: {e}")
+        return False
+
+def db_was_modified(database_name):
+    db_path = os.path.join(WORKING_DIRECTORY, database_name)
+    current_timestamp = os.path.getmtime(db_path)
+    if not hasattr(db_was_modified, "last_timestamp"):
+        db_was_modified.last_timestamp = current_timestamp
+        return False
+    was_modified = db_was_modified.last_timestamp != current_timestamp
+    db_was_modified.last_timestamp = current_timestamp
+    return was_modified

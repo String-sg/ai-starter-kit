@@ -62,10 +62,11 @@ def record_myself():
 			mel = whisper.log_mel_spectrogram(audio).to(model.device)
 			_, probs = model.detect_language(mel)
 			st.write(f"Detected language: {max(probs, key=probs.get)}")
+			lang = max(probs, key=probs.get)
 			options = whisper.DecodingOptions(fp16 = False)
 			result = whisper.decode(model, mel, options)
 			os.remove(tmpfile.name)  # Delete the temporary file manually after processing
-			return result.text
+			return result.text, lang
 
 
 def assessment_prompt(transcript, assessment_type, subject, topic, language):
