@@ -1,6 +1,6 @@
 # No need SQLite
 from files_module import delete_files, display_files, docs_uploader
-from kb_module import delete_vectorstores, display_vectorstores
+from kb_module import create_vectorstore, delete_vectorstores, display_vectorstores
 import streamlit as st
 from analytics_dashboard import pandas_ai, download_data
 from streamlit_antd_components import menu, MenuItem
@@ -73,9 +73,6 @@ class ConfigHandler:
 # Initialization
 config_handler = ConfigHandler()
 
-# Setting Streamlit configurations
-st.set_page_config(layout="wide")
-
 # Fetching secrets from Streamlit
 DEFAULT_TITLE = st.secrets["default_title"]
 SUPER_PWD = st.secrets["super_admin_password"]
@@ -103,6 +100,17 @@ MINDMAP = config_handler.get_value('constants', 'MINDMAP')
 METACOG = config_handler.get_value('constants', 'METACOG')
 
 
+# Path Variables
+faviconPath = "./images/favicon.png"
+
+st.set_page_config(
+    page_title='CherGPT Starter Kit',
+    page_icon=faviconPath,
+    layout='wide',
+    initial_sidebar_state="expanded"
+)
+
+
 def is_function_disabled(function_name):
     return st.session_state.func_options.get(function_name, True)
 
@@ -118,7 +126,7 @@ def main():
             st.session_state.title_page = DEFAULT_TITLE
 
         st.title(st.session_state.title_page)
-        sac.divider(label='A String initiative', icon='house',
+        sac.divider(label='by educators, for educators', icon='house',
                     align='center', direction='horizontal', dashed=False, bold=False)
 
         if "api_key" not in st.session_state:
@@ -244,22 +252,15 @@ def main():
                 ], index=1, format_func='title', open_all=False)
 
         if st.session_state.option == 'Users login':
-            col1, col2 = st.columns([3, 4])
-            placeholder2 = st.empty()
-            with placeholder2:
-                with col1:
-                    if login_function() == True:
-                        placeholder2.empty()
-                        st.session_state.login = True
-                        st.session_state.user = load_user_profile(
-                            st.session_state.user)
-                        pre_load_variables(st.session_state.user['id'])
-                        load_and_fetch_vectorstore_for_user(
-                            st.session_state.user['id'])
-                        load_bot_settings(st.session_state.user['id'])
-                        st.rerun()
-                with col2:
-                    pass
+            if login_function() == True:
+                st.session_state.login = True
+                st.session_state.user = load_user_profile(
+                    st.session_state.user)
+                pre_load_variables(st.session_state.user['id'])
+                load_and_fetch_vectorstore_for_user(
+                    st.session_state.user['id'])
+                load_bot_settings(st.session_state.user['id'])
+                st.rerun()
 
         # Personal Dashboard
         elif st.session_state.option == 'Personal Dashboard':
@@ -283,6 +284,8 @@ def main():
         # Lesson Assistant
         elif st.session_state.option == "Lesson Generator":
             st.subheader(f":green[{st.session_state.option}]")
+            st.info(
+                'Easily create lesson plans informed by epedagogy', icon="ℹ️")
             prompt = lesson_collaborator()
             if prompt:
                 lesson_bot(
@@ -475,6 +478,8 @@ def main():
 
         elif st.session_state.option == "Knowledge Map Generator":
             st.subheader(f":green[{st.session_state.option}]")
+            st.info(
+                'Create mindmap/ concept maps/ process maps quickly with the help of AI', icon="ℹ️")
             mode = sac.switch(label='Generative Mode :', value=True, checked='Coloured Map',
                               unchecked='Process Chart', align='center', position='left', size='default', disabled=False)
             subject, topic, levels = map_creation_form()
@@ -488,7 +493,7 @@ def main():
             if prompt:
                 with st.spinner("Generating mindmap"):
                     st.write(
-                        f"Mindmap generated from the prompt: :orange[**{subject} {topic} {levels}**]")
+                        f"Mindmap generated from the prompt: :orange[**{subject} {topic} ({levels} levels) **]")
                     if mode:
                         uml = generate_plantuml_mindmap(prompt)
                         image = render_diagram(uml)
@@ -525,10 +530,18 @@ def main():
             password_settings(st.session_state.user["username"])
 
         elif st.session_state.option == 'Application Info':
-            st.subheader(f":green[{st.session_state.option}]")
-            st.markdown("Application Information here")
+            st.subheader("About")
+            st.markdown(
+                "The problem is twofold: getting visibility to chatlogs for educators; and accelerating rapid prototyping in the Education sector.")
+            st.markdown(
+                "(1) We built this app to enable more educators to first enable educators to guide student interactions with AI chatbots. While there are ample AI chatbots present - OpenAI’s ChatGPT, Microsoft’s Bing, Anthropic's Claude among others - none of them provide visibility into backend out-of-the-box.")
+            st.markdown(
+                "(2) The second and more interesting problem that we want to solve is to eliminate redundancy for overlapping development work in creating basic AI-powered chatbots. [After various rounds of iteration](https://teachertech.beehiiv.com/p/chergpt-product-log) we know there are a number of base features that educators want.")
+            st.subheader("Team")
+            st.markdown("Main Developer: Joe Tay")
+            st.markdown("Product: Kahhow")
+            st.markdown("Product Ops: Lance, Adrian")
             pass
-
         elif st.session_state.option == 'Logout':
             for key in st.session_state.keys():
                 del st.session_state[key]
