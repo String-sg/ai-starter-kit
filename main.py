@@ -91,6 +91,7 @@ st.set_page_config(layout="wide")
 DEFAULT_TITLE = st.secrets["default_title"]
 SUPER_PWD = st.secrets["super_admin_password"]
 SUPER = st.secrets["super_admin"]
+DEFAULT_DB = st.secrets["default_db"]
 
 # Fetching values from config.ini
 DEFAULT_TEXT = config_handler.get_value('constants', 'DEFAULT_TEXT')
