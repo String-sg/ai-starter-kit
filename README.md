@@ -1,3 +1,6 @@
+> [!WARNING]  
+> We are in the process of a major cleanup. Feel free to test as it is but expect changes/ post cleanup! <: 
+
 # CherGPT Starter Kit
 Enabling teachers to experiment with LLM/ Generative AI in a Q&A chatbot
 <img width="689" alt="chergpt-starter-kit" src="https://github.com/String-sg/chergpt-starter-kit/assets/44336310/3d8ce9e7-acf8-44e9-b28a-19156cc6dbe8">
