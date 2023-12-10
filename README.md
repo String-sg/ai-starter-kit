@@ -3,10 +3,9 @@ Enabling teachers to experiment with LLM/ Generative AI in a Q&A chatbot
 <img width="689" alt="chergpt-starter-kit" src="https://github.com/String-sg/chergpt-starter-kit/assets/44336310/3d8ce9e7-acf8-44e9-b28a-19156cc6dbe8">
 
 This kit will automatically:
- - Create a login page with styled components using [ant_components](https://ant.design/components/overview)*
+ - Create a login page and all the features of a full stack application using ant_components 
  - Create an administrator account, password is pass1234 in a SQL Database
- - Generate 5 teachers account and 40 students<br>
-_* See documentation for streamlit-antd-components [here](https://pypi.org/project/streamlit-antd-components/)_
+ - Generate 5 teachers account and 40 students
 
 ## Key Features:
  -  Upload documents and build a knowledge base using the OpenAI embeddings
@@ -27,37 +26,23 @@ _* See documentation for streamlit-antd-components [here](https://pypi.org/proje
 You can fork it at streamlit community cloud, it can be used straight away, just add the following to your streamlit secrets
 
 > [!IMPORTANT]  
-> The following env variables are required for setup. You can add this to the `secrets.toml` file in your streamlit deployment 
+> The following env variables are required for setup. You can add this to the secrets.toml file in your streamlit deployment 
 ```
-openai_key = “XXX”
+
+openai_key = "YOUR_OPEN_API_KEY"
 default_db = "chergpt.db"
 default_temp = 0.0
 default_frequency_penalty = 0.0
 default_presence_penalty = 0.0
-default_model = "gpt-4"
+default_k_memory = 4
+default_model = "gpt-4-1106-preview"
 default_password = "default_password"
 student_password = "studentp@sswrd"
 teacher_password = "teacherp@sswrd"
-super_admin_password = "anything"
+super_admin_password = "pass1234"
 super_admin = "super_admin"
-default_title = "Starter Kit"
+default_title = "GenAI Workshop Framework V2"
 sql_ext_path = "None"
-[AWS]
-AWS_ACCESS_KEY_ID = "XXX"
-AWS_SECRET_ACCESS_KEY = "XXX"
-AWS_DEFAULT_REGION = "XXX"
 ```
-*Note, even though gpt-4 is the default model, you can also change the default model to:<br>
-`default_model = gpt-3.5-turbo`
-<br><br>
-
-## Setting up local dev env
-To run this locally, first clone it to your local computer via Git. See [here](https://teachertech.beehiiv.com/p/git-for-beginners) for a crash course to git.
-<br><br>
-Prior to running locally, you will need to install required dependencies via this command
-```pip install -r requirements.txt```
-
-To run this locally
-```streamlit run app.py```
-<br><br>
-**Questions?** Ask them on [WhatsApp](https://chat.whatsapp.com/LTNrg30pSil6vuq4zpnhc2) | [Discord](https://discord.gg/dYKVqzfdNH)
+# etd_itd_prototype
+# lesson_support
