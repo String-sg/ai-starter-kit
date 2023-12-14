@@ -12,13 +12,11 @@ else:
     S3_BUCKET = "Default"
 
 # Create or check for the 'database' directory in the current working directory
-cwd = os.getcwd()
-WORKING_DIRECTORY = os.path.join(cwd, "database")
-
-if not os.path.exists(WORKING_DIRECTORY):
-	os.makedirs(WORKING_DIRECTORY)
-
 if st.secrets["sql_ext_path"] == "None":
+	cwd = os.getcwd()
+	WORKING_DIRECTORY = os.path.join(cwd, "database")
+	if not os.path.exists(WORKING_DIRECTORY):
+		os.makedirs(WORKING_DIRECTORY)
 	WORKING_DATABASE= os.path.join(WORKING_DIRECTORY , st.secrets["default_db"])
 else:
 	WORKING_DATABASE= st.secrets["sql_ext_path"]

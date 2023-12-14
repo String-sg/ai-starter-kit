@@ -1,4 +1,4 @@
-#No need SQLite
+# Description: This is the main file for the Streamlit application.
 import nltk
 import streamlit as st
 from streamlit_antd_components import menu, MenuItem
@@ -53,7 +53,6 @@ from basecode.users_module import (
 )
 
 from basecode.bot_settings import bot_settings_interface, load_bot_settings
-from PIL import Image
 import configparser
 import ast
 
@@ -67,16 +66,17 @@ def download_nltk_data_if_absent(package_name):
 
 download_nltk_data_if_absent('punkt')
 
+CONFIG_FILE = st.secrets["config_file"]
 
 class ConfigHandler:
 	def __init__(self):
 		self.config = configparser.ConfigParser()
-		self.config.read('config.ini')
+		self.config.read(CONFIG_FILE)
 
-	def get_value(self, section, key):
+	def get_config_values(self, section, key):
 		value = self.config.get(section, key)
 		try:
-			# Convert string value to a Python data structure
+			# Try converting the string value to a Python data structure
 			return ast.literal_eval(value)
 		except (SyntaxError, ValueError):
 			# If not a data structure, return the plain string
@@ -95,27 +95,15 @@ SUPER = st.secrets["super_admin"]
 DEFAULT_DB = st.secrets["default_db"]
 
 # Fetching values from config.ini
-DEFAULT_TEXT = config_handler.get_value('constants', 'DEFAULT_TEXT')
-TCH = config_handler.get_value('constants', 'TCH')
-STU = config_handler.get_value('constants', 'STU')
-SA = config_handler.get_value('constants', 'SA')
-AD = config_handler.get_value('constants', 'AD')
-COTF = config_handler.get_value('constants', 'COTF')
-META = config_handler.get_value('constants', 'META')
-PANDAI = config_handler.get_value('constants', 'PANDAI')
-MENU_FUNCS = config_handler.get_value('menu_lists', 'MENU_FUNCS')
-META_BOT = config_handler.get_value('constants', 'META_BOT')
-QA_BOT = config_handler.get_value('constants', 'QA_BOT')
-LESSON_BOT = config_handler.get_value('constants', 'LESSON_BOT')
-LESSON_COLLAB = config_handler.get_value('constants', 'LESSON_COLLAB')
-LESSON_COMMENT = config_handler.get_value('constants', 'LESSON_COMMENT')
-LESSON_MAP = config_handler.get_value('constants', 'LESSON_MAP')
-REFLECTIVE = config_handler.get_value('constants', 'REFLECTIVE')
-CONVERSATION = config_handler.get_value('constants', 'CONVERSATION')
-MINDMAP = config_handler.get_value('constants', 'MINDMAP')
-METACOG = config_handler.get_value('constants', 'METACOG')
-ACK = config_handler.get_value('application_agreement', 'ACK')
-PROTOTYPE = config_handler.get_value('constants', 'PROTOTYPE')
+DEFAULT_TEXT = config_handler.get_config_values('constants', 'DEFAULT_TEXT')
+TCH = config_handler.get_config_values('constants', 'TCH')
+STU = config_handler.get_config_values('constants', 'STU')
+SA = config_handler.get_config_values('constants', 'SA')
+AD = config_handler.get_config_values('constants', 'AD')
+BASE_BOT = config_handler.get_config_values('constants', 'BASE_BOT')
+AGENT_BOT = config_handler.get_config_values('constants', 'AGENT_BOT')
+MENU_FUNCS = config_handler.get_config_values('menu_lists', 'MENU_FUNCS')
+ACK = config_handler.get_config_values('application_agreement', 'ACK')
 
 def is_function_disabled(function_name):
 	#st.write("Function name: ", function_name)
@@ -375,14 +363,14 @@ def main():
 					search_bot()
 				else:
 					if st.session_state.memoryless: #memoryless chatbot with knowledge base but no memory
-						basebot_qa(LESSON_BOT)
+						basebot_qa(BASE_BOT)
 					else:
-						basebot_qa_memory(LESSON_BOT) #chatbot with knowledge base and memory
+						basebot_qa_memory(BASE_BOT) #chatbot with knowledge base and memory
 			else:#chatbot with no knowledge base
 				if st.session_state.memoryless: #memoryless chatbot with no knowledge base and no memory
-					basebot(LESSON_BOT)
+					basebot(BASE_BOT)
 				else:
-					basebot_memory(LESSON_BOT) #chatbot with no knowledge base but with memory
+					basebot_memory(BASE_BOT) #chatbot with no knowledge base but with memory
 					
 				
 		elif st.session_state.option == "Agent Chatbot":

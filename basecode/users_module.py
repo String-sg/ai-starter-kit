@@ -5,10 +5,12 @@ import os
 import ast
 from basecode.kb_module import load_vectorstore
 
+CONFIG_FILE = st.secrets["config_file"]
+
 class ConfigHandler:
 	def __init__(self):
 		self.config = configparser.ConfigParser()
-		self.config.read('config.ini')
+		self.config.read(CONFIG_FILE)
 
 	def get_config_values(self, section, key):
 		value = self.config.get(section, key)
@@ -26,13 +28,11 @@ SA = config_handler.get_config_values('constants', 'SA')
 AD = config_handler.get_config_values('constants', 'AD')
 
 # Create or check for the 'database' directory in the current working directory
-cwd = os.getcwd()
-WORKING_DIRECTORY = os.path.join(cwd, "database")
-
-if not os.path.exists(WORKING_DIRECTORY):
-	os.makedirs(WORKING_DIRECTORY)
-
 if st.secrets["sql_ext_path"] == "None":
+	cwd = os.getcwd()
+	WORKING_DIRECTORY = os.path.join(cwd, "database")
+	if not os.path.exists(WORKING_DIRECTORY):
+		os.makedirs(WORKING_DIRECTORY)
 	WORKING_DATABASE= os.path.join(WORKING_DIRECTORY , st.secrets["default_db"])
 else:
 	WORKING_DATABASE= st.secrets["sql_ext_path"]

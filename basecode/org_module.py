@@ -8,10 +8,12 @@ import configparser
 import os
 import ast
 
+CONFIG_FILE = st.secrets["config_file"]
+
 class ConfigHandler:
 	def __init__(self):
 		self.config = configparser.ConfigParser()
-		self.config.read('config.ini')
+		self.config.read(CONFIG_FILE)
 
 	def get_config_values(self, section, key):
 		value = self.config.get(section, key)
@@ -40,15 +42,12 @@ SCH_PROFILES = config_handler.get_config_values('menu_lists', 'SCH_PROFILES')
 EDU_ORGS = config_handler.get_config_values('menu_lists', 'EDU_ORGS')
 MENU_FUNCS = config_handler.get_config_values('menu_lists', 'MENU_FUNCS')
 
-
 # Create or check for the 'database' directory in the current working directory
-cwd = os.getcwd()
-WORKING_DIRECTORY = os.path.join(cwd, "database")
-
-if not os.path.exists(WORKING_DIRECTORY):
-	os.makedirs(WORKING_DIRECTORY)
-
 if st.secrets["sql_ext_path"] == "None":
+	cwd = os.getcwd()
+	WORKING_DIRECTORY = os.path.join(cwd, "database")
+	if not os.path.exists(WORKING_DIRECTORY):
+		os.makedirs(WORKING_DIRECTORY)
 	WORKING_DATABASE= os.path.join(WORKING_DIRECTORY , st.secrets["default_db"])
 else:
 	WORKING_DATABASE= st.secrets["sql_ext_path"]

@@ -136,5 +136,5 @@ def agent_management():
 		# Map selected tool names to their respective functions
 		tools = [all_tools[name] for name in selected_tool_names]
 		st.session_state.tools = tools
-		st.write("Selected Tools:", st.session_state.tools)
+		#st.write("Selected Tools:", st.session_state.tools)
 		

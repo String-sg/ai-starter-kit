@@ -10,6 +10,7 @@ from langchain.chat_models import ChatOpenAI
 import streamlit_antd_components as sac
 import configparser
 import os
+import ast
 from Markdown2docx import Markdown2docx
 
 client = OpenAI(
@@ -17,22 +18,34 @@ client = OpenAI(
     api_key=return_api_key(),
 )
 
-config = configparser.ConfigParser()
-config.read('config.ini')
+CONFIG_FILE = st.secrets["config_file"]
 
-NEW_PLAN  = config['constants']['NEW_PLAN']
-FEEDBACK_PLAN = config['constants']['FEEDBACK_PLAN']
-PERSONAL_PROMPT = config['constants']['PERSONAL_PROMPT']
-DEFAULT_TEXT = config['constants']['DEFAULT_TEXT']
+class ConfigHandler:
+	def __init__(self):
+		self.config = configparser.ConfigParser()
+		self.config.read(CONFIG_FILE)
+
+	def get_config_values(self, section, key):
+		value = self.config.get(section, key)
+		try:
+			# Try converting the string value to a Python data structure
+			return ast.literal_eval(value)
+		except (SyntaxError, ValueError):
+			# If not a data structure, return the plain string
+			return value
+
+config_handler = ConfigHandler()
+DEFAULT_TEXT = config_handler.get_config_values('constants', 'DEFAULT_TEXT')
+NEW_PLAN  = config_handler.get_config_values('constants', 'NEW_PLAN')
+FEEDBACK_PLAN = config_handler.get_config_values('constants', 'FEEDBACK_PLAN')
+PERSONAL_PROMPT = config_handler.get_config_values('constants', 'PERSONAL_PROMPT')
 
 # Create or check for the 'database' directory in the current working directory
-cwd = os.getcwd()
-WORKING_DIRECTORY = os.path.join(cwd, "database")
-
-if not os.path.exists(WORKING_DIRECTORY):
-	os.makedirs(WORKING_DIRECTORY)
-
 if st.secrets["sql_ext_path"] == "None":
+	cwd = os.getcwd()
+	WORKING_DIRECTORY = os.path.join(cwd, "database")
+	if not os.path.exists(WORKING_DIRECTORY):
+		os.makedirs(WORKING_DIRECTORY)
 	WORKING_DATABASE= os.path.join(WORKING_DIRECTORY , st.secrets["default_db"])
 else:
 	WORKING_DATABASE= st.secrets["sql_ext_path"]
