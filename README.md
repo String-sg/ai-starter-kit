@@ -57,6 +57,6 @@ Prior to running locally, you will need to install required dependencies via thi
 ```pip install -r requirements.txt```
 
 To run this locally
-```streamlit run app.py```
+```streamlit run main.py```
 <br><br>
 **Questions?** Ask them on [WhatsApp](https://chat.whatsapp.com/LTNrg30pSil6vuq4zpnhc2) | [Discord](https://discord.gg/dYKVqzfdNH)
