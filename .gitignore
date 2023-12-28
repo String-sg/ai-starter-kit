@@ -1,6 +1,29 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.log
 secrets.toml
 .venv/
 *.csv
 database/
 References/
 String Brand ID/
+
+# OS-specific
+.DS_Store
+._*
+.vscode
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IPython
+profile_default/
+ipython_config.py
