@@ -38,10 +38,11 @@ else:
 def bot_settings():
 	with st.form(key='sliders_form'):
 		# Sliders for settings
-		temp = st.slider("Temp", min_value=0.0, max_value=1.0, value=0.5, step=0.01)
-		presence_penalty = st.slider("Presence Penalty", min_value=-2.0, max_value=2.0, value=0.5, step=0.01)
-		frequency_penalty = st.slider("Frequency Penalty", min_value=-2.0, max_value=2.0, value=0.5, step=0.01)
-
+		st.write("Current User Bot Settings")
+		temp = st.slider("Temp", min_value=0.0, max_value=1.0, value=st.session_state.temp, step=0.01)
+		presence_penalty = st.slider("Presence Penalty", min_value=-2.0, max_value=2.0, value=st.session_state.presence_penalty, step=0.01)
+		frequency_penalty = st.slider("Frequency Penalty", min_value=-2.0, max_value=2.0, value=st.session_state.frequency_penalty, step=0.01)
+		chat_memory = st.slider("Chat Memory", min_value=0, max_value=10, value=st.session_state.k_memory, step=1)	
 		# Submit button for the form
 		submit_button = st.form_submit_button(label='Submit')
 
@@ -50,6 +51,7 @@ def bot_settings():
 			st.session_state.temp = temp
 			st.session_state.presence_penalty = presence_penalty
 			st.session_state.frequency_penalty = frequency_penalty
+			st.session_state.k_memory = chat_memory
 			st.success("Parameters saved!")
 
 def store_bot_settings(user_id, temp, presence_penalty, frequency_penalty):
@@ -137,26 +139,30 @@ def bot_settings_interface(profile_id, school_id=None):
 			st.session_state.temp = temp
 			st.session_state.presence_penalty = presence_penalty
 			st.session_state.frequency_penalty = frequency_penalty
+			store_bot_settings(st.session_state.user['id'], temp, presence_penalty, frequency_penalty)
 			st.success("Parameters saved!")
+			if should_propagate:
+				with sqlite3.connect(WORKING_DATABASE) as conn:
+					cursor = conn.cursor()
 
-		with sqlite3.connect(WORKING_DATABASE) as conn:
-			cursor = conn.cursor()
-
-			# Logic for handling SA and AD profiles:
-			if profile_id == SA:
-				# Fetch all schools for SA to select from
-				cursor.execute("SELECT school_id, school_name FROM Schools")
-				schools = cursor.fetchall()
-				school_choices = {school[1]: school[0] for school in schools}
-				selected_school_name = st.selectbox("Select School for Propagation:", list(school_choices.keys()))
-				selected_school_id = school_choices[selected_school_name]
-			elif profile_id == AD:
-				# AD can only propagate to their school, so no need for a selectbox
-				selected_school_id = school_id
-				st.write(f"You're set to propagate settings to school with ID: {school_id}")
-			
-			if submit_button:
-				store_bot_settings(st.session_state.user['id'], temp, presence_penalty, frequency_penalty)
-				if should_propagate:
-					propagate_bot_settings(profile_id, temp, presence_penalty, frequency_penalty, selected_school_id)
-				st.success("Parameters saved!")
+					# Logic for handling SA and AD profiles:
+					if profile_id == SA:
+						# Fetch all schools for SA to select from
+						cursor.execute("SELECT school_id, school_name FROM Schools")
+						schools = cursor.fetchall()
+						school_choices = {school[1]: school[0] for school in schools}
+						selected_school_name = st.selectbox("Select School for Propagation:", list(school_choices.keys()))
+						if selected_school_name == None:
+							st.error("Please create a new school first.")
+						else:	
+							selected_school_id = school_choices[selected_school_name]
+							propagate_bot_settings(profile_id, temp, presence_penalty, frequency_penalty, selected_school_id)
+							st.success("Propagate complete")
+						
+					elif profile_id == AD:
+						# AD can only propagate to their school, so no need for a selectbox
+						selected_school_id = school_id
+						st.write(f"You're set to propagate settings to school with ID: {school_id}")
+						selected_school_id = school_choices[selected_school_name]
+						propagate_bot_settings(profile_id, temp, presence_penalty, frequency_penalty, selected_school_id)
+						st.success("Propagate complete")

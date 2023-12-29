@@ -122,7 +122,7 @@ def create_dbs():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS Data_Table (
             data_id INTEGER PRIMARY KEY,
-            date TEXT NOT NULL UNIQUE,
+            date TEXT,
             user_id INTEGER NOT NULL,
             profile_id INTEGER NOT NULL,
             chatbot_ans TEXT,
@@ -177,7 +177,7 @@ def create_dbs():
             vs_id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             vectorstore_name TEXT NOT NULL, 
-            data BLOB NOT NULL,
+            documents TEXT NOT NULL,
             subject INTEGER,
             topic INTEGER,
             sharing_enabled BOOLEAN NOT NULL DEFAULT 0,
@@ -241,6 +241,7 @@ def create_dbs():
             temp REAL,
             presence_penalty REAL,
             frequency_penalty REAL,
+			chat_memory INTEGER,
             FOREIGN KEY(user_id) REFERENCES Users(user_id)
         )
         ''')

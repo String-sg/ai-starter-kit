@@ -8,11 +8,12 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import LanceDB
-from authenticate import return_api_key
+from basecode.authenticate import return_api_key
+from langchain.docstore.document import Document
 import lancedb  
-import pickle
 import configparser
 import ast
+import json
 
 class ConfigHandler:
     def __init__(self):
@@ -47,6 +48,11 @@ if st.secrets["sql_ext_path"] == "None":
 	WORKING_DATABASE= os.path.join(WORKING_DIRECTORY , st.secrets["default_db"])
 else:
 	WORKING_DATABASE= st.secrets["sql_ext_path"]
+
+os.environ["OPENAI_API_KEY"] = return_api_key()
+lancedb_path = os.path.join(WORKING_DIRECTORY, "lancedb")
+db = lancedb.connect(lancedb_path)
+
 
 def fetch_vectorstores_with_usernames():
     conn = sqlite3.connect(WORKING_DATABASE)
@@ -259,43 +265,57 @@ def save_to_vectorstores(vs, vstore_input_name, subject, topic, username, share_
     user_id = user_details[0]
 
     # If Vector_Store instance exists in session state, then serialize and save
+    # vs is the documents in json format and vstore_input_name is the name of the table and vectorstore
     if vs:
-        serialized_db = pickle.dumps(vs)
+        try:
+            
+            cursor.execute('SELECT 1 FROM Vector_Stores WHERE vectorstore_name LIKE ? AND user_id = ?', (f"%{vstore_input_name}%", user_id))
+            exists = cursor.fetchone()
 
-        # Check if the entry already exists
-        cursor.execute('SELECT 1 FROM Vector_Stores WHERE vectorstore_name LIKE ? AND user_id = ?', (f"%{vstore_input_name}%", user_id))
-        exists = cursor.fetchone()
+            if exists:
+                st.error("Error: An entry with the same vectorstore_name and user_id already exists.")
+                return
+            
+            if subject is None:
+                st.error("Error: Subject is missing.")
+                return
 
-        if exists:
-            st.error("Error: An entry with the same vectorstore_name and user_id already exists.")
+            if topic is None:
+                st.error("Error: Topic is missing.")
+                return
+
+            # Get the subject and topic IDs
+            cursor.execute('SELECT id FROM Subject WHERE subject_name = ?', (subject,))
+            subject_id = cursor.fetchone()[0]
+
+            cursor.execute('SELECT id FROM Topic WHERE topic_name = ?', (topic,))
+            topic_id = cursor.fetchone()[0]
+
+            # Insert the new row
+            cursor.execute('''
+            INSERT INTO Vector_Stores (vectorstore_name, documents, user_id, subject, topic, sharing_enabled)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ''', (vstore_input_name, vs, user_id, subject_id, topic_id, share_resource))
+
+            conn.commit()
+            conn.close()
+            
+            
+        except Exception as e:
+            st.error(f"Error in storing documents and vectorstore: {e}")
             return
-        
-        if subject is None:
-            st.error("Error: Subject is missing.")
-            return
 
-        if topic is None:
-            st.error("Error: Topic is missing.")
-            return
+def document_to_dict(doc):
+    # Assuming 'doc' has 'page_content' and 'metadata' attributes
+    return {
+        'page_content': doc.page_content,
+        'metadata': doc.metadata
+    }
 
-        # Get the subject and topic IDs
-        cursor.execute('SELECT id FROM Subject WHERE subject_name = ?', (subject,))
-        subject_id = cursor.fetchone()[0]
-
-        cursor.execute('SELECT id FROM Topic WHERE topic_name = ?', (topic,))
-        topic_id = cursor.fetchone()[0]
-
-        # Insert the new row
-        cursor.execute('''
-        INSERT INTO Vector_Stores (vectorstore_name, data, user_id, subject, topic, sharing_enabled)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (vstore_input_name, serialized_db, user_id, subject_id, topic_id, share_resource))
-
-        conn.commit()
-
-        
-
-    conn.close()
+def dict_to_document(doc_dict):
+    # Create a Document object from the dictionary
+    # Adjust this according to how your Document class is defined
+    return Document(page_content=doc_dict['page_content'],metadata=doc_dict['metadata'])
 
 def create_vectorstore():
     openai.api_key = return_api_key()
@@ -360,14 +380,44 @@ def create_vectorstore():
                 file_data, meta = fetch_file_data(file_id)
                 docs = split_docs(file_data, meta)
                 full_docs.extend(docs)
-        
+            #convert full_docs to json to store in sqlite
+            full_docs_dicts = [document_to_dict(doc) for doc in full_docs]
+            docs_json = json.dumps(full_docs_dicts)
             
-            db = LanceDB.from_documents(full_docs, OpenAIEmbeddings(), connection=create_lancedb_table(embeddings, meta, vs_name)) 
-            save_to_vectorstores(db, vs_name, subject, topic, st.session_state.user["username"], share_resource)  # Passing the share_resource to the function
+            #db = LanceDB.from_documents(full_docs, OpenAIEmbeddings(), connection=create_lancedb_table(embeddings, meta, vs_name))
+            #table = create_lancedb_table(embeddings, meta, vs_name)
+            # lancedb_path = os.path.join(WORKING_DIRECTORY, "lancedb")
+	        # LanceDB connection
+            # db = lancedb.connect(lancedb_path)
+            # st.session_state.test1 = table
+            # st.write("full_docs",full_docs)
+            #full_docs_dicts = [document_to_dict(doc) for doc in full_docs]
+            #docs_json = json.dumps(full_docs_dicts)
+            # st.write("docs_json",docs_json)
+            #retrieved_docs_dicts = get_docs()  # Assuming this returns the list of dictionaries
+            # retrieved_docs_dicts = json.loads(docs_json)
+            # retrieved_docs = [dict_to_document(doc_dict) for doc_dict in retrieved_docs_dicts]
+            # st.write("retrieved_docs",retrieved_docs)
+            #st.session_state.test2 = json.loads(docs_json)
+            # st.session_state.vs = LanceDB.from_documents(retrieved_docs , OpenAIEmbeddings(), connection= db.open_table("_(super_admin)"))
+            # st.session_state.current_model = "test1"
+            # st.write(st.session_state.test1)
+            #st.write(st.session_state.test2)
+            #st.write(type(db))
+            #st.session_state.vs = load_vectorstore(documents, table_name)
+            create_lancedb_table(embeddings, meta, vs_name)
+            save_to_vectorstores(docs_json, vs_name, subject, topic, st.session_state.user["username"], share_resource)  # Passing the share_resource to the function
             st.success("Knowledge Base loaded")
 
     else:
         st.write("No files found in the database.")
+
+def load_vectorstore(documents, table_name):
+    
+    retrieved_docs_dicts = json.loads(documents)
+    retrieved_docs = [dict_to_document(doc_dict) for doc_dict in retrieved_docs_dicts]
+    vs = LanceDB.from_documents(retrieved_docs , OpenAIEmbeddings(), connection= db.open_table(f"{table_name}"))
+    return vs
 
 
 def delete_lancedb_table(table_name):

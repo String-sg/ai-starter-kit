@@ -1,6 +1,6 @@
 import sqlite3
-from authenticate import hash_password
-from database_module import populate_functions
+from basecode.authenticate import hash_password
+from basecode.database_module import populate_functions
 import streamlit as st
 import time
 import pandas as pd
@@ -78,10 +78,13 @@ def initialise_admin_account():
 		# Check if the super_admin account exists
 		cursor.execute('SELECT 1 FROM Users WHERE username = ?', (SUPER,))
 		admin_account_exists = cursor.fetchone()
-
+		cursor.execute("SELECT COUNT(*) FROM App_Functions")
+		count = cursor.fetchone()[0]
+		if count == 0:
+			populate_functions(MENU_FUNCS)
 		if admin_account_exists:
 			return
-		populate_functions(MENU_FUNCS)
+		#populate_functions(MENU_FUNCS)
 		# Insert organizations into the Organizations table and retrieve their IDs
 		org_ids = {}
 		for org in EDU_ORGS:
@@ -206,11 +209,14 @@ def create_org_structure():
 
 		# When the submit button is pressed
 		if st.button('Submit'):
+			# Check if school with the same name already exists for the organization
 			cursor.execute("SELECT school_name FROM Schools WHERE LOWER(school_name) = ?", (school_name.lower(),))
 			existing_school = cursor.fetchone()
 
 			if existing_school:
 				st.warning(f"School {school_name} already exists. Please choose a different name")
+				
+
 			else:
 				cursor.execute("INSERT INTO Schools (org_id, school_name) VALUES ((SELECT org_id FROM Organizations WHERE org_name = ?), ?)", (org_name, school_name))
 				student_counter = 1
@@ -353,62 +359,62 @@ def remove_or_reassign_teacher_ui(school_id):
 
 
 def change_teacher_profile_ui(school_id):
-    """
-    Display the UI for changing the profile of teachers in a specific school.
+	"""
+	Display the UI for changing the profile of teachers in a specific school.
 
-    :param school_id: The ID of the school.
-    """
-    st.title("Change Teacher Profiles")
+	:param school_id: The ID of the school.
+	"""
+	st.title("Change Teacher Profiles")
 
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
+	with sqlite3.connect(WORKING_DATABASE) as conn:
+		cursor = conn.cursor()
 
-        # Fetch all profile names and their IDs excluding the 'STU' profile
-        cursor.execute("SELECT profile_id, profile_name FROM Profile WHERE profile_id != ? AND profile_id != ?", (STU,SA))
-        profiles_data = cursor.fetchall()
-        profile_id_to_name = {id: name for id, name in profiles_data}
-        profile_name_to_id = {name: id for id, name in profiles_data}
+		# Fetch all profile names and their IDs excluding the 'STU' profile
+		cursor.execute("SELECT profile_id, profile_name FROM Profile WHERE profile_id != ? AND profile_id != ?", (STU,SA))
+		profiles_data = cursor.fetchall()
+		profile_id_to_name = {id: name for id, name in profiles_data}
+		profile_name_to_id = {name: id for id, name in profiles_data}
 
-        # Get profile_ids that match the SCH_PROFILES list
-        sch_profile_ids = [profile_name_to_id[profile_name] for profile_name in SCH_PROFILES if profile_name in profile_name_to_id]
+		# Get profile_ids that match the SCH_PROFILES list
+		sch_profile_ids = [profile_name_to_id[profile_name] for profile_name in SCH_PROFILES if profile_name in profile_name_to_id]
 
-        # Fetch all teachers within the given school that have a profile in SCH_PROFILES
-        cursor.execute("""
-            SELECT user_id, username, profile_id 
-            FROM Users 
-            WHERE school_id = ? AND profile_id IN ({})
-        """.format(','.join('?' * len(sch_profile_ids))), [school_id] + sch_profile_ids)
-        teachers = cursor.fetchall()
+		# Fetch all teachers within the given school that have a profile in SCH_PROFILES
+		cursor.execute("""
+			SELECT user_id, username, profile_id 
+			FROM Users 
+			WHERE school_id = ? AND profile_id IN ({})
+		""".format(','.join('?' * len(sch_profile_ids))), [school_id] + sch_profile_ids)
+		teachers = cursor.fetchall()
 
-        # If no teachers are found
-        if not teachers:
-            st.write("No teachers found for this school!")
-            return
+		# If no teachers are found
+		if not teachers:
+			st.write("No teachers found for this school!")
+			return
 
-        # Store the selected profile for each teacher
-        teacher_profile_selections = {}
+		# Store the selected profile for each teacher
+		teacher_profile_selections = {}
 
-        # Display all teachers with a selectbox for changing their profile
-        for teacher in teachers:
-            user_id, username, current_profile_id = teacher
-            selected_profile_name = st.selectbox(
-                f"Change profile for {username}",
-                options=list(profile_name_to_id.keys()),
-                index=list(profile_id_to_name.keys()).index(current_profile_id),
-                key=username
-            )
-            teacher_profile_selections[user_id] = profile_name_to_id[selected_profile_name]
+		# Display all teachers with a selectbox for changing their profile
+		for teacher in teachers:
+			user_id, username, current_profile_id = teacher
+			selected_profile_name = st.selectbox(
+				f"Change profile for {username}",
+				options=list(profile_name_to_id.keys()),
+				index=list(profile_id_to_name.keys()).index(current_profile_id),
+				key=username
+			)
+			teacher_profile_selections[user_id] = profile_name_to_id[selected_profile_name]
 
-        # If a button is pressed, update the selected teachers' profiles
-        if st.button("Update Profiles"):
-            for user_id, new_profile_id in teacher_profile_selections.items():
-                cursor.execute("""
-                    UPDATE Users
-                    SET profile_id = ?
-                    WHERE user_id = ?
-                """, (new_profile_id, user_id))
-            conn.commit()
-            st.success("Teacher profiles updated successfully!")
+		# If a button is pressed, update the selected teachers' profiles
+		if st.button("Update Profiles"):
+			for user_id, new_profile_id in teacher_profile_selections.items():
+				cursor.execute("""
+					UPDATE Users
+					SET profile_id = ?
+					WHERE user_id = ?
+				""", (new_profile_id, user_id))
+			conn.commit()
+			st.success("Teacher profiles updated successfully!")
 
 
 
@@ -509,200 +515,221 @@ def process_user_profile(profile_name):
 
 #this is the interface for the addition of school
 def add_level(school_id):
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
-        
-        # Retrieve org_id based on school_id
-        cursor.execute("SELECT org_id FROM Schools WHERE school_id = ?", (school_id,))
-        org_id = cursor.fetchone()[0]
+	st.subheader("Add Level")
+	with sqlite3.connect(WORKING_DATABASE) as conn:
+		cursor = conn.cursor()
+		
+		# Retrieve org_id based on school_id
+		cursor.execute("SELECT org_id FROM Schools WHERE school_id = ?", (school_id,))
+		org_id = cursor.fetchone()[0]
 
-        # Collect inputs
-        level_name = st.text_input("Enter level name:")
-        
-        if st.button('Add Level'):
-            # Check if level with the same name already exists for the school
-            cursor.execute("SELECT level_name FROM Levels WHERE school_id = ? AND level_name = ?", (school_id, level_name))
-            existing_level = cursor.fetchone()
-            
-            if existing_level:
-                st.warning(f"Level {level_name} already exists for this school. Please choose a different name.")
-            else:
-                cursor.execute("INSERT INTO Levels (org_id, school_id, level_name) VALUES (?, ?, ?)", (org_id, school_id, level_name))
-                conn.commit()
-                st.success("Level added successfully!")
+		# Collect inputs
+		level_name = st.text_input("Enter level name:")
+		
+		if st.button('Add Level'):
+			# Check if level with the same name already exists for the school
+			cursor.execute("SELECT level_name FROM Levels WHERE school_id = ? AND level_name = ?", (school_id, level_name))
+			existing_level = cursor.fetchone()
+			
+			if existing_level:
+				st.warning(f"Level {level_name} already exists for this school. Please choose a different name.")
+			else:
+				cursor.execute("INSERT INTO Levels (org_id, school_id, level_name) VALUES (?, ?, ?)", (org_id, school_id, level_name))
+				conn.commit()
+				st.success("Level added successfully!")
 
 				
 #------------------------------------------------------------------------------------------------add later -------------------------------------------------
 #this is the interface for the addition of class
 def add_class(school_id):
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
-        
-        # Retrieve org_id based on school_id
-        cursor.execute("SELECT org_id FROM Schools WHERE school_id = ?", (school_id,))
-        org_id = cursor.fetchone()[0]
+	st.subheader("Add Class")
+	with sqlite3.connect(WORKING_DATABASE) as conn:
+		cursor = conn.cursor()
+		
+		# Retrieve org_id based on school_id
+		cursor.execute("SELECT org_id FROM Schools WHERE school_id = ?", (school_id,))
+		org_id = cursor.fetchone()[0]
 
-        # Retrieve available levels for the school
-        cursor.execute("SELECT DISTINCT level_name FROM Levels WHERE school_id = ?", (school_id,))
-        available_levels = [level[0] for level in cursor.fetchall()]
+		# Retrieve available levels for the school
+		cursor.execute("SELECT DISTINCT level_name FROM Levels WHERE school_id = ?", (school_id,))
+		available_levels = [level[0] for level in cursor.fetchall()]
 
-        # Collect inputs
-        level_name = st.selectbox("Select level:", available_levels)
-        class_name = st.text_input("Enter class name:")
-        
-        if st.button('Add Class'):
-            # Check if class with the same name already exists for the selected level and school
-            cursor.execute("SELECT class_name FROM Classes WHERE school_id = ? AND level_id = (SELECT level_id FROM Levels WHERE level_name = ? AND school_id = ?) AND class_name = ?", (school_id, level_name, school_id, class_name))
-            existing_class = cursor.fetchone()
-            
-            if existing_class:
-                st.warning(f"Class {class_name} already exists for this level and school. Please choose a different name.")
-            else:
-                cursor.execute("INSERT INTO Classes (org_id, school_id, level_id, class_name) VALUES (?, ?, (SELECT level_id FROM Levels WHERE level_name = ? AND school_id = ?), ?)", (org_id, school_id, level_name, school_id, class_name))
-                conn.commit()
-                st.success("Class added successfully!")
+		# Collect inputs
+		level_name = st.selectbox("Select level:", available_levels)
+		class_name = st.text_input("Enter class name:")
+		
+		if st.button('Add Class'):
+			# Check if class with the same name already exists for the selected level and school
+			cursor.execute("SELECT class_name FROM Classes WHERE school_id = ? AND level_id = (SELECT level_id FROM Levels WHERE level_name = ? AND school_id = ?) AND class_name = ?", (school_id, level_name, school_id, class_name))
+			existing_class = cursor.fetchone()
+			
+			if existing_class:
+				st.warning(f"Class {class_name} already exists for this level and school. Please choose a different name.")
+			else:
+				cursor.execute("INSERT INTO Classes (org_id, school_id, level_id, class_name) VALUES (?, ?, (SELECT level_id FROM Levels WHERE level_name = ? AND school_id = ?), ?)", (org_id, school_id, level_name, school_id, class_name))
+				conn.commit()
+				st.success("Class added successfully!")
 
 #this is the interface for the addition of users
 def add_user(school_id):
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
+	try: 
+		st.subheader("Add User")
+		with sqlite3.connect(WORKING_DATABASE) as conn:
+			cursor = conn.cursor()
 
-        # Retrieve org_id based on school_id
-        cursor.execute("SELECT org_id FROM Schools WHERE school_id = ?", (school_id,))
-        org_id = cursor.fetchone()[0]
+			# Retrieve org_id based on school_id
+			cursor.execute("SELECT org_id FROM Schools WHERE school_id = ?", (school_id,))
+			org_id = cursor.fetchone()[0]
 
-        # Determine type of user to add
-        user_type = st.selectbox("Select user type:", ["Teacher", "Student"])
+			# Determine type of user to add
+			user_type = st.selectbox("Select user type:", ["Teacher", "Student"])
 
-        # Capture common inputs
-        username = st.text_input(f"Enter {user_type.lower()} username:")
+			# Capture common inputs
+			username = st.text_input(f"Enter {user_type.lower()} username (Do not put tch1/stu1 at the start as it will be appended automatically):")
 
-        if user_type == "Teacher":
-            if st.button(f'Add {user_type}'):
-                teacher_username = f"tch{school_id}_{username}"
-                cursor.execute("INSERT INTO Users (username, password, profile_id, school_id, org_id) VALUES (?, ?, ?, ?, ?)", (teacher_username, hash_password(TCH_PASS), TCH, school_id, org_id))
-                conn.commit()
-                st.success(f"{user_type} added successfully!")
-        
-        elif user_type == "Student":
-            # Retrieve available classes for the school
-            cursor.execute("SELECT class_name FROM Classes WHERE school_id = ?", (school_id,))
-            available_classes = [cls[0] for cls in cursor.fetchall()]
-            class_name = st.selectbox("Select class:", available_classes)
+			if user_type == "Teacher":
+				if st.button(f'Add {user_type}'):
+					teacher_username = f"tch{school_id}_{username}"
+					cursor.execute("INSERT INTO Users (username, password, profile_id, school_id, org_id) VALUES (?, ?, ?, ?, ?)", (teacher_username, hash_password(TCH_PASS), TCH, school_id, org_id))
+					conn.commit()
+					st.success(f"{user_type} added successfully!")
+			
+			elif user_type == "Student":
+				# Retrieve available classes for the school
+				cursor.execute("SELECT class_name FROM Classes WHERE school_id = ?", (school_id,))
+				available_classes = [cls[0] for cls in cursor.fetchall()]
+				class_name = st.selectbox("Select class:", available_classes)
 
-            if st.button(f'Add {user_type}'):
-                student_username = f"stu{school_id}_{username}"
-                cursor.execute("INSERT INTO Users (username, password, profile_id, school_id, class_id, org_id, level_id) VALUES (?, ?, ?, ?, (SELECT class_id FROM Classes WHERE class_name = ? AND school_id = ?), ?, (SELECT level_id FROM Levels WHERE level_name = (SELECT level_name FROM Classes WHERE class_name = ? AND school_id = ?) AND school_id = ?))", 
-                               (student_username, hash_password(STU_PASS), STU, school_id, class_name, school_id, org_id, class_name, school_id, school_id))
-                conn.commit()
-                st.success(f"{user_type} added successfully!")
+				if st.button(f'Add {user_type}'):
+					student_username = f"stu{school_id}_{username}"
+					cursor.execute("INSERT INTO Users (username, password, profile_id, school_id, class_id, org_id, level_id) VALUES (?, ?, ?, ?, (SELECT class_id FROM Classes WHERE class_name = ? AND school_id = ?), ?, (SELECT level_id FROM Levels WHERE level_name = (SELECT level_name FROM Classes WHERE class_name = ? AND school_id = ?) AND school_id = ?))", 
+								(student_username, hash_password(STU_PASS), STU, school_id, class_name, school_id, org_id, class_name, school_id, school_id))
+					conn.commit()
+					st.success(f"{user_type} added successfully!")
+	except Exception as e:
+		st.write("An error occurred:", 	e)
 
 
 def display_options(cursor, table_name, column_name, previous_conditions=[]):
-    query = f"SELECT DISTINCT {column_name} FROM {table_name} WHERE 1=1"
-    for condition in previous_conditions:
-        query += f" AND {condition}"
-    cursor.execute(query)
-    results = cursor.fetchall()
-    options = [result[0] for result in results]
-    return st.selectbox(f"Select from {table_name}", options)
+	query = f"SELECT DISTINCT {column_name} FROM {table_name} WHERE 1=1"
+	for condition in previous_conditions:
+		query += f" AND {condition}"
+	cursor.execute(query)
+	results = cursor.fetchall()
+	options = [result[0] for result in results]
+	return st.selectbox(f"Select from {table_name}", options)
 
-#this is the interface for the removal of users
-def remove_user():
-    conn = sqlite3.connect(WORKING_DATABASE)
-    cursor = conn.cursor()
 
-    school_id = display_options(cursor, "Schools", "school_id")
-    level_id = display_options(cursor, "Levels", "level_id", [f"school_id={school_id}"])
-    class_id = display_options(cursor, "Classes", "class_id", [f"school_id={school_id}", f"level_id={level_id}"])
+def remove_user(school_id):
+	#not working yet
+	st.subheader("Remove Users")
+	conn = sqlite3.connect(WORKING_DATABASE)
+	cursor = conn.cursor()
 
-    cursor.execute("SELECT user_id, username FROM Users WHERE school_id=? AND level_id=? AND class_id=?", (school_id, level_id, class_id))
-    users = cursor.fetchall()
+	# Fetch all users except the super_admin and the current user
+	cursor.execute("SELECT user_id, username FROM Users WHERE school_id=? AND user_id NOT IN (?)", (school_id, 1))
+	users = cursor.fetchall()
 
-    user_options = [user[1] for user in users]
-    selected_user = st.selectbox("Select User", user_options)
-    user_id = [user[0] for user in users if user[1] == selected_user][0]
+	if not users:
+		st.write("No users available for deletion.")
+		return
 
-    if st.button(f"Delete User with ID {user_id}"):
-        confirmation = st.checkbox("Are you sure? This action cannot be undone.")
+	user_options = [user[1] for user in users]
+	selected_user = st.selectbox("Select User", user_options)
+	user_id = [user[0] for user in users if user[1] == selected_user][0]
+	
 
-        if confirmation:
-            cursor.execute("DELETE FROM Users WHERE user_id=?", (user_id,))
-            cursor.execute("DELETE FROM Teacher_Assignments WHERE teacher_id=?", (user_id,))
-            cursor.execute("DELETE FROM Data_Table WHERE user_id=?", (user_id,))
-            cursor.execute("DELETE FROM Files WHERE user_id=?", (user_id,))
-            cursor.execute("DELETE FROM Vector_Stores WHERE user_id=?", (user_id,))
-            cursor.execute("DELETE FROM Prompt_Templates WHERE user_id=?", (user_id,))
-            cursor.execute("DELETE FROM App_Functions_Link WHERE user_id=?", (user_id,))
-            conn.commit()
-            st.write("User Deleted Successfully!")
-    
-    conn.close()
+	if st.button(f"Delete User with ID {user_id}"):
+		confirmation = st.checkbox("Are you sure? This action cannot be undone.")
+
+		if confirmation:
+			try:
+				# Delete or handle dependent records in other tables first
+				cursor.execute("DELETE FROM Teacher_Assignments WHERE teacher_id=?", (user_id,))
+				cursor.execute("DELETE FROM Data_Table WHERE user_id=?", (user_id,))
+				cursor.execute("DELETE FROM Files WHERE user_id=?", (user_id,))
+				cursor.execute("DELETE FROM Vector_Stores WHERE user_id=?", (user_id,))
+				cursor.execute("DELETE FROM Prompt_Templates WHERE user_id=?", (user_id,))
+				cursor.execute("DELETE FROM App_Functions_Link WHERE user_id=?", (user_id,))
+				cursor.execute("DELETE FROM BotSettings WHERE user_id=?", (user_id,))
+				cursor.execute("DELETE FROM User_VectorStores WHERE user_id=?", (user_id,))
+				#Finally, delete the user
+				cursor.execute("DELETE FROM Users WHERE username=?", ("tch1_tch1_18",))
+
+				conn.commit()
+				st.write("User Deleted Successfully!")
+			except sqlite3.Error as e:
+				st.write("An error occurred:", e)
+				conn.rollback()
+			finally:
+				conn.close()
+		else:
+			st.write("Deletion cancelled.")
 
 def delete_if_no_association(cursor, table_name, column_name, value):
-    """ Check if a value has no associated records """
-    associated_tables = {
-        "Schools": ["Levels", "Classes", "Users"],
-        "Levels": ["Classes", "Users"],
-        "Classes": ["Users"]
-    }
+	""" Check if a value has no associated records """
+	associated_tables = {
+		"Schools": ["Levels", "Classes", "Users"],
+		"Levels": ["Classes", "Users"],
+		"Classes": ["Users"]
+	}
 
-    for associated_table in associated_tables.get(table_name, []):
-        cursor.execute(f"SELECT COUNT(*) FROM {associated_table} WHERE {column_name}=?", (value,))
-        count = cursor.fetchone()[0]
-        if count > 0:
-            return False
-    
-    cursor.execute(f"DELETE FROM {table_name} WHERE {column_name}=?", (value,))
-    return True
+	for associated_table in associated_tables.get(table_name, []):
+		cursor.execute(f"SELECT COUNT(*) FROM {associated_table} WHERE {column_name}=?", (value,))
+		count = cursor.fetchone()[0]
+		if count > 0:
+			return False
+	
+	cursor.execute(f"DELETE FROM {table_name} WHERE {column_name}=?", (value,))
+	return True
 
 def delete_class(class_id):
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
-        success = delete_if_no_association(cursor, "Classes", "class_id", class_id)
-        return "Class Deleted Successfully!" if success else "Cannot delete: Class has associated records."
+	with sqlite3.connect(WORKING_DATABASE) as conn:
+		cursor = conn.cursor()
+		success = delete_if_no_association(cursor, "Classes", "class_id", class_id)
+		return "Class Deleted Successfully!" if success else "Cannot delete: Class has associated records."
 
 def delete_level(level_id):
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
-        success = delete_if_no_association(cursor, "Levels", "level_id", level_id)
-        return "Level Deleted Successfully!" if success else "Cannot delete: Level has associated records."
+	with sqlite3.connect(WORKING_DATABASE) as conn:
+		cursor = conn.cursor()
+		success = delete_if_no_association(cursor, "Levels", "level_id", level_id)
+		return "Level Deleted Successfully!" if success else "Cannot delete: Level has associated records."
 
 def delete_school(school_id):
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
-        success = delete_if_no_association(cursor, "Schools", "school_id", school_id)
-        return "School Deleted Successfully!" if success else "Cannot delete: School has associated records."
+	with sqlite3.connect(WORKING_DATABASE) as conn:
+		cursor = conn.cursor()
+		success = delete_if_no_association(cursor, "Schools", "school_id", school_id)
+		return "School Deleted Successfully!" if success else "Cannot delete: School has associated records."
 def get_values_from_table(table_name, column_name):
-    """ Fetch values from a given table and column """
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT DISTINCT {column_name} FROM {table_name}")
-        return [item[0] for item in cursor.fetchall()]
+	""" Fetch values from a given table and column """
+	with sqlite3.connect(WORKING_DATABASE) as conn:
+		cursor = conn.cursor()
+		cursor.execute(f"SELECT DISTINCT {column_name} FROM {table_name}")
+		return [item[0] for item in cursor.fetchall()]
 	
 #this is the interface for the delete class, levels or schools 
 def streamlit_delete_interface():
-    st.title("Delete Records")
+	st.title("Delete Records")
 
-    choice = st.selectbox("Which entity do you want to delete?", ["Class", "Level", "School"])
-    
-    if choice == "Class":
-        class_ids = get_values_from_table("Classes", "class_id")
-        selected_class = st.selectbox("Choose a Class to delete:", class_ids)
-        if st.button("Delete Class"):
-            result = delete_class(selected_class)
-            st.write(result)
+	choice = st.selectbox("Which entity do you want to delete?", ["Class", "Level", "School"])
+	
+	if choice == "Class":
+		class_ids = get_values_from_table("Classes", "class_id")
+		selected_class = st.selectbox("Choose a Class to delete:", class_ids)
+		if st.button("Delete Class"):
+			result = delete_class(selected_class)
+			st.write(result)
 
-    elif choice == "Level":
-        level_ids = get_values_from_table("Levels", "level_id")
-        selected_level = st.selectbox("Choose a Level to delete:", level_ids)
-        if st.button("Delete Level"):
-            result = delete_level(selected_level)
-            st.write(result)
+	elif choice == "Level":
+		level_ids = get_values_from_table("Levels", "level_id")
+		selected_level = st.selectbox("Choose a Level to delete:", level_ids)
+		if st.button("Delete Level"):
+			result = delete_level(selected_level)
+			st.write(result)
 
-    elif choice == "School":
-        school_ids = get_values_from_table("Schools", "school_id")
-        selected_school = st.selectbox("Choose a School to delete:", school_ids)
-        if st.button("Delete School"):
-            result = delete_school(selected_school)
-            st.write(result)
+	elif choice == "School":
+		school_ids = get_values_from_table("Schools", "school_id")
+		selected_school = st.selectbox("Choose a School to delete:", school_ids)
+		if st.button("Delete School"):
+			result = delete_school(selected_school)
+			st.write(result)

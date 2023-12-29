@@ -1,20 +1,29 @@
 # No need SQLite
-from files_module import delete_files, display_files, docs_uploader
-from kb_module import create_vectorstore, delete_vectorstores, display_vectorstores
+import nltk
 import streamlit as st
-from analytics_dashboard import pandas_ai, download_data
 from streamlit_antd_components import menu, MenuItem
 import streamlit_antd_components as sac
-from main_bot import basebot_memory, basebot_qa_memory, clear_session_states, search_bot, basebot, basebot_qa
-# from kb_module import display_files, docs_uploader, delete_files
-# from vs_module import display_vectorstores, create_vectorstore, delete_vectorstores
-from authenticate import login_function, check_password
-from class_dash import download_data_table_csv
-from lesson_plan import lesson_collaborator, lesson_commentator, lesson_bot
+from basecode.main_bot import basebot_memory, basebot_qa_memory, clear_session_states, search_bot, basebot, basebot_qa, complete_my_lesson
+from basecode.files_module import display_files, docs_uploader, delete_files
+from basecode.kb_module import display_vectorstores, create_vectorstore, delete_vectorstores
+from basecode.authenticate import login_function, check_password
+from basecode.class_dash import download_data_table_csv
 # New schema move function fom settings
-from database_schema import create_dbs
-from database_module import manage_tables, delete_tables
-from org_module import (
+from basecode.database_schema import create_dbs
+from basecode.agent import agent_management, agent_bot, wiki_search, DuckDuckGoSearchRun, YouTubeSearchTool
+
+from basecode.database_module import (
+    manage_tables,
+    delete_tables,
+    download_database,
+    upload_database,
+    upload_s3_database,
+    download_from_s3_and_unzip,
+    check_aws_secrets_exist,
+    backup_s3_database,
+    db_was_modified
+)
+from basecode.org_module import (
     has_at_least_two_rows,
     initialise_admin_account,
     load_user_profile,
@@ -24,10 +33,15 @@ from org_module import (
     process_user_profile,
     remove_or_reassign_teacher_ui,
     reassign_student_ui,
-    change_teacher_profile_ui
+    change_teacher_profile_ui,
+    add_user,
+    streamlit_delete_interface,
+    add_class,
+    add_level,
 )
-from pwd_module import reset_passwords, password_settings
-from users_module import (
+
+from basecode.pwd_module import reset_passwords, password_settings
+from basecode.users_module import (
     link_users_to_app_function_ui,
     set_function_access_for_user,
     create_prompt_template,
@@ -37,22 +51,23 @@ from users_module import (
     load_and_fetch_vectorstore_for_user,
     link_profiles_to_vectorstore_interface
 )
-from k_map import (
-    map_prompter,
-    generate_mindmap,
-    map_creation_form,
-    map_prompter_with_plantuml_form,
-    generate_plantuml_mindmap,
-    render_diagram,
-    output_mermaid_diagram
-)
-from audio import record_myself, assessment_prompt
-from bot_settings import bot_settings_interface, load_bot_settings
+
+from basecode.bot_settings import bot_settings_interface, load_bot_settings
 from PIL import Image
 import configparser
-import os
 import ast
-from metacog import science_feedback, reflective_peer
+
+
+def download_nltk_data_if_absent(package_name):
+    try:
+        # Try loading the package to see if it exists
+        nltk.data.find('tokenizers/' + package_name)
+    except LookupError:
+        # If the package doesn't exist, download it
+        nltk.download(package_name)
+
+
+download_nltk_data_if_absent('punkt')
 
 
 class ConfigHandler:
@@ -73,10 +88,14 @@ class ConfigHandler:
 # Initialization
 config_handler = ConfigHandler()
 
+# Setting Streamlit configurations
+st.set_page_config(layout="wide")
+
 # Fetching secrets from Streamlit
 DEFAULT_TITLE = st.secrets["default_title"]
 SUPER_PWD = st.secrets["super_admin_password"]
 SUPER = st.secrets["super_admin"]
+DEFAULT_DB = st.secrets["default_db"]
 
 # Fetching values from config.ini
 DEFAULT_TEXT = config_handler.get_value('constants', 'DEFAULT_TEXT')
@@ -98,21 +117,24 @@ REFLECTIVE = config_handler.get_value('constants', 'REFLECTIVE')
 CONVERSATION = config_handler.get_value('constants', 'CONVERSATION')
 MINDMAP = config_handler.get_value('constants', 'MINDMAP')
 METACOG = config_handler.get_value('constants', 'METACOG')
-
-
-# Path Variables
-faviconPath = "./images/favicon.png"
-
-st.set_page_config(
-    page_title='CherGPT Starter Kit',
-    page_icon=faviconPath,
-    layout='wide',
-    initial_sidebar_state="expanded"
-)
+ACK = config_handler.get_value('application_agreement', 'ACK')
+PROTOTYPE = config_handler.get_value('constants', 'PROTOTYPE')
 
 
 def is_function_disabled(function_name):
+    # st.write("Function name: ", function_name)
+    # st.write("Function options: ", st.session_state.func_options.get(function_name, True))
     return st.session_state.func_options.get(function_name, True)
+
+
+def return_function_name(function_name, default_name=""):
+    if st.session_state.func_options.get(function_name, True):
+        return "-"
+    else:
+        if default_name == "":
+            return function_name
+        else:
+            return default_name
 
 
 def initialize_session_state(menu_funcs, default_value):
@@ -126,8 +148,7 @@ def main():
             st.session_state.title_page = DEFAULT_TITLE
 
         st.title(st.session_state.title_page)
-        sac.divider(label='by educators, for educators', icon='house',
-                    align='center', direction='horizontal', dashed=False, bold=False)
+        sac.divider(label='String', icon='house', align='center')
 
         if "api_key" not in st.session_state:
             st.session_state.api_key = ""
@@ -141,6 +162,9 @@ def main():
         if "user" not in st.session_state:
             st.session_state.user = None
 
+        if "start" not in st.session_state:
+            st.session_state.start = 0
+
         if "openai_model" not in st.session_state:
             st.session_state.openai_model = st.secrets["default_model"]
 
@@ -150,14 +174,23 @@ def main():
         if "rating" not in st.session_state:
             st.session_state.rating = False
 
+        if "lesson_plan" not in st.session_state:
+            st.session_state.lesson_plan = ""
+
         if "temp" not in st.session_state:
             st.session_state.temp = st.secrets["default_temp"]
+
+        if "acknowledgement" not in st.session_state:
+            st.session_state.acknowledgement = False
 
         if "frequency_penalty" not in st.session_state:
             st.session_state.frequency_penalty = st.secrets["default_frequency_penalty"]
 
         if "presence_penalty" not in st.session_state:
             st.session_state.presence_penalty = st.secrets["default_presence_penalty"]
+
+        if "k_memory" not in st.session_state:
+            st.session_state.k_memory = st.secrets["default_k_memory"]
 
         if "memoryless" not in st.session_state:
             st.session_state.memoryless = False
@@ -171,9 +204,6 @@ def main():
         if "svg_height" not in st.session_state:
             st.session_state["svg_height"] = 1000
 
-        if "previous_mermaid" not in st.session_state:
-            st.session_state["previous_mermaid"] = ""
-
         if "current_model" not in st.session_state:
             st.session_state.current_model = "No KB loaded"
 
@@ -181,86 +211,142 @@ def main():
             st.session_state.func_options = {}
             initialize_session_state(MENU_FUNCS, True)
 
+        if "tools" not in st.session_state:
+            st.session_state.tools = []
+
+        if "lesson_col_prompt" not in st.session_state:
+            st.session_state.lesson_col_prompt = False
+
+        if "lesson_col_option" not in st.session_state:
+            st.session_state.lesson_col_option = 'Cancel'
+
+        if "generated_flag" not in st.session_state:
+            st.session_state.generated_flag = False
+
+        if "button_text" not in st.session_state:
+            st.session_state.button_text = "Cancel"
+
+        if "data_doc" not in st.session_state:
+            st.session_state.data_doc = ""
+
+        if "download_response_flag" not in st.session_state:
+            st.session_state.download_response_flag = False
+
+        if "chatbot_index" not in st.session_state:
+            st.session_state.chatbot_index = 1
+
+        if "chat_response" not in st.session_state:
+            st.session_state.chat_response = ""
+
+        # useful session state variables for testing and debugging
+        # not in use for production
+        if "test1" not in st.session_state:
+            st.session_state.test1 = ""
+
+        if "test2" not in st.session_state:
+            st.session_state.test2 = ""
+
+        # These functions below will create the initial database and administator account
         create_dbs()
         initialise_admin_account()
-        with st.sidebar:
-            # KH: let's refactor this to a physical toggle instead of manually switching - definitely will cause accidental styling changes
-            # if st.session_state.login == False:
-            # 	image = Image.open('cotf_logo.png')
-            # 	st.image(image)
-            # else:
-            # 	image_function(st.session_state.user['school_id'])
+
+        # PLEASE REMOVE THIS or COMMENT IT
+        # st.write("User Profile: ", st.session_state.user)
+
+        # PLEASE REMOVE ABOVE
+        with st.sidebar:  # options for sidebar
+
             if st.session_state.login == False:
-                image = Image.open('primary_green.png')
-                st.image(image)
-                st.session_state.option = menu([MenuItem('Users login', icon='people'), MenuItem(
-                    'Application Info', icon='info-circle')])
+                st.image("app_logo/primary_green.png")
+                st.session_state.option = menu(
+                    [MenuItem('Users login', icon='people')])
             else:
-                image = Image.open('primary_green.png')
-                st.image(image)
+                # can do a test if user is school is something show a different logo and set a different API key
                 # super admin login feature
                 if st.session_state.user['profile_id'] == SA:
                     # Initialize the session state for function options
                     initialize_session_state(MENU_FUNCS, False)
                 else:
-                    set_function_access_for_user(st.session_state.user['id'])
+                    if st.session_state.acknowledgement == False:
+                        initialize_session_state(MENU_FUNCS, True)
+                    else:
+                        set_function_access_for_user(
+                            st.session_state.user['id'])
+                        # st.write("Function options: ", st.session_state.func_options)
                     # Using the is_function_disabled function for setting the `disabled` attribute
-
                 st.session_state.option = sac.menu([
                     sac.MenuItem('Home', icon='house', children=[
-                        sac.MenuItem('Personal Dashboard', icon='person-circle',
-                                     disabled=is_function_disabled('Personal Dashboard')),
-                        sac.MenuItem('Analytics Dashboard', icon='clipboard-data',
-                                     disabled=is_function_disabled('Analytics Dashboard')),
+                        sac.MenuItem(return_function_name(
+                            'Personal Dashboard'), icon='person-circle', disabled=is_function_disabled('Personal Dashboard')),
+                        # sac.MenuItem('Class Dashboard', icon='clipboard-data', disabled=is_function_disabled('Class Dashboard')),
                     ]),
-                    sac.MenuItem('Lesson Assistant', icon='person-fill-gear', children=[
-                        sac.MenuItem('Lesson Generator', icon='pencil-square',
-                                     disabled=is_function_disabled('Lesson Generator')),
-                        sac.MenuItem('Lesson Feedback', icon='chat-left-dots',
-                                     disabled=is_function_disabled('Lesson Feedback')),
-                    ]),
-                    sac.MenuItem('Learning Tools', icon='tools', children=[
-                        sac.MenuItem('Knowledge Map Generator', icon='diagram-3-fill',
-                                     disabled=is_function_disabled('Knowledge Map Generator')),
-                        sac.MenuItem('Conversation Assistant', icon='people-fill',
-                                     disabled=is_function_disabled('Conversation Assistant')),
-                    ]),
-                    sac.MenuItem("Remarks Co-Pilot", icon='link-45deg', href='https://remarkscopilot.vercel.app',
-                                 disabled=is_function_disabled('Remarks Copilot')),
-                    sac.MenuItem('Dialogic Agent', icon='robot', children=[
-                        sac.MenuItem('Chatbot', icon='chat-square-dots',
-                                     disabled=is_function_disabled('Chatbot')),
-                        sac.MenuItem('Bot & Prompt Management', icon='wrench',
-                                     disabled=is_function_disabled('Chatbot Management')),
+
+
+                    sac.MenuItem('Types of ChatBots', icon='person-fill-gear', children=[
+                        sac.MenuItem(return_function_name(
+                            'AI Chatbot'), icon='chat-dots', disabled=is_function_disabled('AI Chatbot')),
+                        sac.MenuItem(return_function_name(
+                            'Agent Chatbot'), icon='chat-dots', disabled=is_function_disabled('Agent Chatbot')),
+                        sac.MenuItem(return_function_name(
+                            'Chatbot Management'), icon='wrench', disabled=is_function_disabled('Chatbot Management')),
+
                     ]),
                     sac.MenuItem('Knowledge Base Tools', icon='book', children=[
-                        sac.MenuItem('Files Management', icon='file-arrow-up',
-                                     disabled=is_function_disabled('Files management')),
-                        sac.MenuItem('Knowledge Base Editor', icon='database-fill-up',
-                                     disabled=is_function_disabled('KB management')),
+                        sac.MenuItem(return_function_name('Files management', 'Files Management'),
+                                     icon='file-arrow-up', disabled=is_function_disabled('Files management')),
+                        sac.MenuItem(return_function_name('KB management', 'Knowledge Base Editor'),
+                                     icon='database-fill-up', disabled=is_function_disabled('KB management')),
                     ]),
                     sac.MenuItem('Organisation Tools', icon='buildings', children=[
-                        sac.MenuItem('Org Management', icon='building-gear',
-                                     disabled=is_function_disabled('Organisation Management')),
-                        sac.MenuItem('Users Management', icon='house-gear',
-                                     disabled=is_function_disabled('School Users Management')),
+                        sac.MenuItem(return_function_name('Organisation Management', 'Org Management'),
+                                     icon='building-gear', disabled=is_function_disabled('Organisation Management')),
+                        sac.MenuItem(return_function_name('School Users Management', 'Users Management'),
+                                     icon='house-gear', disabled=is_function_disabled('School Users Management')),
                     ]),
                     sac.MenuItem(type='divider'),
                     sac.MenuItem('Profile Settings', icon='gear'),
                     sac.MenuItem('Application Info', icon='info-circle'),
                     sac.MenuItem('Logout', icon='box-arrow-right'),
-                ], index=1, format_func='title', open_all=False)
+                ], index=st.session_state.start, format_func='title', open_all=True)
 
         if st.session_state.option == 'Users login':
-            if login_function() == True:
-                st.session_state.login = True
-                st.session_state.user = load_user_profile(
-                    st.session_state.user)
-                pre_load_variables(st.session_state.user['id'])
-                load_and_fetch_vectorstore_for_user(
-                    st.session_state.user['id'])
-                load_bot_settings(st.session_state.user['id'])
-                st.rerun()
+            col1, col2 = st.columns([3, 4])
+            placeholder = st.empty()
+            with placeholder:
+                with col1:
+                    if login_function() == True:
+                        st.session_state.user = load_user_profile(
+                            st.session_state.user)
+                        pre_load_variables(st.session_state.user['id'])
+                        load_and_fetch_vectorstore_for_user(
+                            st.session_state.user['id'])
+                        load_bot_settings(st.session_state.user['id'])
+                        st.session_state.login = True
+                        placeholder.empty()
+                        st.rerun()
+                with col2:
+                    pass
+        elif st.session_state.option == 'Home':
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.subheader(
+                    "Acknowledgement on the use of Generative AI with Large Language Models")
+                initialize_session_state(MENU_FUNCS, True)
+                st.write(ACK)
+                ack = st.checkbox("I acknowledge the above information")
+                if ack:
+                    st.session_state.acknowledgement = True
+                    set_function_access_for_user(st.session_state.user['id'])
+                    st.session_state.start = 1
+                    st.rerun()
+                else:
+                    st.warning(
+                        "Please acknowledge the above information before you proceed")
+                    initialize_session_state(MENU_FUNCS, True)
+                    st.stop()
+                pass
+            with col2:
+                pass
 
         # Personal Dashboard
         elif st.session_state.option == 'Personal Dashboard':
@@ -276,86 +362,85 @@ def main():
                     st.session_state.user["id"], st.session_state.user["school_id"], st.session_state.user["profile_id"])
             display_vectorstores()
             vectorstore_selection_interface(st.session_state.user['id'])
-        elif st.session_state.option == 'Analytics Dashboard':
-            st.subheader(f":green[{st.session_state.option}]")
-            pandas_ai(
-                st.session_state.user['id'], st.session_state.user['school_id'], st.session_state.user['profile_id'])
-            pass
-        # Lesson Assistant
-        elif st.session_state.option == "Lesson Generator":
-            st.subheader(f":green[{st.session_state.option}]")
-            st.info(
-                'Easily create lesson plans informed by epedagogy', icon="ℹ️")
-            prompt = lesson_collaborator()
-            if prompt:
-                lesson_bot(
-                    prompt, st.session_state.lesson_generator, LESSON_COLLAB)
 
-        elif st.session_state.option == "Lesson Feedback":
-            st.subheader(f":green[{st.session_state.option}]")
-            prompt = lesson_commentator()
-            if prompt:
-                lesson_bot(prompt, st.session_state.lesson_feedback,
-                           LESSON_COMMENT)
-
-        elif st.session_state.option == "Chatbot":
-            st.subheader(f":green[{st.session_state.option}]")
-            sac.divider(label='Chatbot Settings', icon='robot', align='center',
-                        direction='horizontal', dashed=False, bold=False)
+        elif st.session_state.option == 'AI Chatbot':
+            # Code for AI Chatbot - ZeroCode
+            st.write("Current Chatbot Template: ", st.session_state.chatbot)
             # check if API key is entered
             with st.expander("Chatbot Settings"):
                 vectorstore_selection_interface(st.session_state.user['id'])
-                if st.session_state.vs:  # chatbot with knowledge base
-                    raw_search = sac.switch(
-                        label='Raw Search', value=False, align='start', position='left')
+                # new options --------------------------------------------------------
+                if st.session_state.vs:
+                    vs_flag = False
+                else:
+                    vs_flag = True
+                options = sac.chip(
+                    items=[
+                        sac.ChipItem(label='Raw Search',
+                                     icon='search', disabled=vs_flag),
+                        sac.ChipItem(label='Enable Memory', icon='memory'),
+                        sac.ChipItem(label='Rating Function',
+                                     icon='star-fill'),
+                        sac.ChipItem(label='Capture Responses',
+                                     icon='camera-fill'),
+                        sac.ChipItem(label='Download Responses',
+                                     icon='download'),
+                    ], index=[1, 2, 3], format_func='title', radius='sm', size='sm', align='left', variant='light', multiple=True)
+                # Update state based on new chip selections
+                raw_search = 'Raw Search' in options
+                st.session_state.memoryless = 'Enable Memory' not in options
+                st.session_state.rating = 'Rating Function' in options
+                st.session_state.download_response_flag = 'Capture Responses' in options
+                preview_download_response = 'Download Responses' in options
+
                 clear = sac.switch(label='Clear Chat',
                                    value=False, align='start', position='left')
                 if clear == True:
                     clear_session_states()
-                mem = sac.switch(label='Enable Memory',
-                                 value=True, align='start', position='left')
-                if mem == True:
-                    st.session_state.memoryless = False
-                else:
-                    st.session_state.memoryless = True
-                rating = sac.switch(label='Rate Response',
-                                    value=True, align='start', position='left')
-                if rating == True:
-                    st.session_state.rating = True
-                else:
-                    st.session_state.rating = False
-                # vm = sac.switch(label='Visual Mapping', value=False, align='start', position='left', size='small')
-                # if vm == True:
-                # 	st.session_state.visuals = True
-                # else:
-                # 	st.session_state.visuals = False
+                if preview_download_response:
+                    complete_my_lesson()
+
             if st.session_state.vs:  # chatbot with knowledge base
                 if raw_search == True:
                     search_bot()
                 else:
                     if st.session_state.memoryless:  # memoryless chatbot with knowledge base but no memory
-                        basebot_qa(QA_BOT)
+                        basebot_qa(LESSON_BOT)
                     else:
                         # chatbot with knowledge base and memory
-                        basebot_qa_memory(QA_BOT)
+                        basebot_qa_memory(LESSON_BOT)
             else:  # chatbot with no knowledge base
                 if st.session_state.memoryless:  # memoryless chatbot with no knowledge base and no memory
-                    basebot(QA_BOT)
+                    basebot(LESSON_BOT)
                 else:
                     # chatbot with no knowledge base but with memory
-                    basebot_memory(QA_BOT)
+                    basebot_memory(LESSON_BOT)
 
-        # Dialogic Agent
+        elif st.session_state.option == "Agent Chatbot":
+            if st.session_state.tools == []:
+                st.warning(
+                    "Loading Wikipedia Search, Internet Search and YouTube Search, you may select your tools in Bot & Prompt management")
+                st.session_state.tools = [wiki_search, DuckDuckGoSearchRun(
+                    name="Internet Search"), YouTubeSearchTool()]
+                agent_bot()
+            else:
+                agent_bot()
 
         # ensure that it is for administrator or super_admin
-        elif st.session_state.option == 'Bot & Prompt Management':
+        elif st.session_state.option == 'Chatbot Management':
             if st.session_state.user['profile_id'] == SA or st.session_state.user['profile_id'] == AD:
                 st.subheader(f":green[{st.session_state.option}]")
-                create_prompt_template(st.session_state.user['id'])
-                update_prompt_template(st.session_state.user['profile_id'])
-                st.subheader("OpenAI Chatbot Parameters Settings")
-                bot_settings_interface(
-                    st.session_state.user['profile_id'], st.session_state.user['school_id'])
+                templates = create_prompt_template(st.session_state.user['id'])
+                st.divider()
+                # st.write("Templates created: ", templates)
+                update_prompt_template(
+                    st.session_state.user['profile_id'], templates)
+                st.subheader("Agent Management")
+                agent_management()
+                if st.session_state.user['profile_id'] == SA:
+                    st.subheader("OpenAI Chatbot Parameters Settings")
+                    bot_settings_interface(
+                        st.session_state.user['profile_id'], st.session_state.user['school_id'])
             else:
                 st.subheader(
                     f":red[This option is accessible only to administrators only]")
@@ -402,17 +487,22 @@ def main():
 
         # Organisation Tools
         elif st.session_state.option == "Users Management":
-            st.subheader(f":green[{st.session_state.option}]")
-            sch_id, msg = process_user_profile(
-                st.session_state.user["profile_id"])
-            rows = has_at_least_two_rows()
-            if rows >= 2:
-                # Password Reset
-                st.subheader("User accounts information")
-                df = display_accounts(sch_id)
-                st.warning("Password Management")
-                st.subheader("Reset passwords of users")
-                reset_passwords(df)
+            if st.session_state.user['profile_id'] == SA or st.session_state.user['profile_id'] == AD:
+                st.subheader(f":green[{st.session_state.option}]")
+                sch_id, msg = process_user_profile(
+                    st.session_state.user["profile_id"])
+                rows = has_at_least_two_rows()
+                if rows >= 2:
+                    # Password Reset
+                    st.subheader("User accounts information")
+                    df = display_accounts(sch_id)
+                    st.warning("Password Management")
+                    st.subheader("Reset passwords of users")
+                    reset_passwords(df)
+                    add_user(sch_id)
+            else:
+                st.subheader(
+                    f":red[This option is accessible only to administrators only]")
 
         elif st.session_state.option == "Org Management":
             if st.session_state.user['profile_id'] == SA:
@@ -445,7 +535,9 @@ def main():
                             sac.StepsItem(
                                 title='step 5', description='Reassign Students to Classes(Optional)'),
                             sac.StepsItem(
-                                title='step 6', description='Managing SQL Schema Tables', icon='radioactive'),
+                                title='step 6', description='Add/Delete Classes and Levels'),
+                            sac.StepsItem(
+                                title='step 7', description='Managing SQL Schema Tables', icon='radioactive'),
                         ], format_func='title', placement='vertical', size='small'
                     )
                     if steps_options == "step 1":
@@ -462,10 +554,25 @@ def main():
                     elif steps_options == "step 5":
                         reassign_student_ui(sch_id)
                     elif steps_options == "step 6":
+                        add_level(sch_id)
+                        st.divider()
+                        add_class(sch_id)
+                        st.divider()
+                        streamlit_delete_interface()
+                    elif steps_options == "step 7":
                         st.subheader(":red[Managing SQL Schema Tables]")
                         st.warning(
                             "Please do not use this function unless you know what you are doing")
                         if st.checkbox("I know how to manage SQL Tables"):
+                            st.subheader(
+                                ":red[Zip Database - Download and upload a copy of the database]")
+                            download_database()
+                            upload_database()
+                            if check_aws_secrets_exist():
+                                st.subheader(
+                                    ":red[Upload Database to S3 - Upload a copy of the database to S3]")
+                                upload_s3_database()
+                                download_from_s3_and_unzip()
                             st.subheader(
                                 ":red[Display and Edit Tables - please do so if you have knowledge of the current schema]")
                             manage_tables()
@@ -476,88 +583,69 @@ def main():
                 st.subheader(
                     f":red[This option is accessible only to super administrators only]")
 
-        elif st.session_state.option == "Knowledge Map Generator":
-            st.subheader(f":green[{st.session_state.option}]")
-            st.info(
-                'Create mindmap/ concept maps/ process maps quickly with the help of AI', icon="ℹ️")
-            mode = sac.switch(label='Generative Mode :', value=True, checked='Coloured Map',
-                              unchecked='Process Chart', align='center', position='left', size='default', disabled=False)
-            subject, topic, levels = map_creation_form()
-            prompt = False
-            if subject and topic and levels:
-                if mode:
-                    prompt = map_prompter_with_plantuml_form(
-                        subject, topic, levels)
-                else:
-                    prompt = map_prompter(subject, topic, levels)
-            if prompt:
-                with st.spinner("Generating mindmap"):
-                    st.write(
-                        f"Mindmap generated from the prompt: :orange[**{subject} {topic} ({levels} levels) **]")
-                    if mode:
-                        uml = generate_plantuml_mindmap(prompt)
-                        image = render_diagram(uml)
-                        st.image(image)
-                    else:
-                        syntax = generate_mindmap(prompt)
-                        if syntax:
-                            output_mermaid_diagram(syntax)
-
-        elif st.session_state.option == "Conversation Assistant":
-            st.subheader(f":green[{st.session_state.option}]")
-            # Create form
-            subject = st.text_input("Subject:")
-            topic = st.text_input("Topic:")
-            assessment_type = st.selectbox("Type of Assessment:", [
-                                           "Oral Assessment", "Content Assessment", "Transcribing No Assessment"])
-            transcript = record_myself()
-            if transcript:
-                if assessment_type == "Transcribing No Assessment":
-                    st.write(f"Transcript: {transcript}")
-                    st.session_state.msg.append(
-                        {"role": "assistant", "content": transcript})
-                else:
-                    if subject and topic:
-                        assessment_prompt(
-                            transcript, assessment_type, subject, topic)
-                    else:
-                        st.warning(
-                            "Please fill in all the fields in the oral submission form")
-
         elif st.session_state.option == "Profile Settings":
             st.subheader(f":green[{st.session_state.option}]")
             # direct_vectorstore_function()
             password_settings(st.session_state.user["username"])
 
         elif st.session_state.option == 'Application Info':
-            st.subheader("About")
-            st.markdown(
-                "The problem is twofold: getting visibility to chatlogs for educators; and accelerating rapid prototyping in the Education sector.")
-            st.markdown(
-                "(1) We built this app to enable more educators to first enable educators to guide student interactions with AI chatbots. While there are ample AI chatbots present - OpenAI’s ChatGPT, Microsoft’s Bing, Anthropic's Claude among others - none of them provide visibility into backend out-of-the-box.")
-            st.markdown(
-                "(2) The second and more interesting problem that we want to solve is to eliminate redundancy for overlapping development work in creating basic AI-powered chatbots. [After various rounds of iteration](https://teachertech.beehiiv.com/p/chergpt-product-log) we know there are a number of base features that educators want.")
-            st.subheader("Team")
-            st.markdown("Main Developer: Joe Tay")
-            st.markdown("Product: Kahhow")
-            st.markdown("Product Ops: Lance, Adrian")
-            pass
+            st.subheader(f":green[{st.session_state.option}]")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.subheader(
+                    "Acknowledgement on the use of Generative AI with Large Language Models")
+                initialize_session_state(MENU_FUNCS, True)
+                st.write(ACK)
+                if st.session_state.acknowledgement == True:
+                    st.success("You have acknowledged the above information")
+                else:
+                    ack = st.checkbox("I acknowledge the above information")
+                    if ack:
+                        st.session_state.acknowledgement = True
+                        set_function_access_for_user(
+                            st.session_state.user['id'])
+                        st.session_state.start = 1
+                        st.rerun()
+                    else:
+                        st.warning(
+                            "Please acknowledge the above information before you proceed")
+                        initialize_session_state(MENU_FUNCS, True)
+                        st.stop()
+                    pass
+            with col2:
+                pass
+
         elif st.session_state.option == 'Logout':
-            for key in st.session_state.keys():
-                del st.session_state[key]
-            st.rerun()
-            pass
+            if db_was_modified(DEFAULT_DB):
+                if check_aws_secrets_exist():
+                    backup_s3_database()
+                    for key in st.session_state.keys():
+                        del st.session_state[key]
+                    st.rerun()
+                elif st.session_state.user['profile_id'] == SA:
+                    on = st.toggle(
+                        'I do not want to download a copy of the database')
+                    if on:
+                        for key in st.session_state.keys():
+                            del st.session_state[key]
+                        st.rerun()
+                    else:
+                        download_database()
+                        for key in st.session_state.keys():
+                            del st.session_state[key]
+                        st.rerun()
+                else:
+                    for key in st.session_state.keys():
+                        del st.session_state[key]
+                    st.rerun()
+            else:
+                for key in st.session_state.keys():
+                    del st.session_state[key]
+                st.rerun()
+
     except Exception as e:
         st.exception(e)
 
 
 if __name__ == "__main__":
     main()
-
-hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)

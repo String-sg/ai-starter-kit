@@ -1,11 +1,9 @@
 import sqlite3
-from authenticate import hash_password
 import streamlit as st
-import pandas as pd
-import pickle
 import configparser
 import os
 import ast
+from basecode.kb_module import load_vectorstore
 
 class ConfigHandler:
 	def __init__(self):
@@ -26,8 +24,6 @@ DEFAULT_TEXT = config_handler.get_config_values('constants', 'DEFAULT_TEXT')
 PROMPT_TEMPLATES_FUNCTIONS = config_handler.get_config_values('menu_lists', 'PROMPT_TEMPLATES_FUNCTIONS')
 SA = config_handler.get_config_values('constants', 'SA')
 AD = config_handler.get_config_values('constants', 'AD')
-GENERATOR_PROMPT = config_handler.get_config_values('Prompt_Design_Templates', 'GENERATOR_PROMPT')
-FEEDBACK_PROMPT = config_handler.get_config_values('Prompt_Design_Templates', 'FEEDBACK_PROMPT')
 
 # Create or check for the 'database' directory in the current working directory
 cwd = os.getcwd()
@@ -129,23 +125,22 @@ def link_users_to_app_function_ui(school_id):
             user_ids = [row[0] for row in cursor.fetchall()]
 
             for user_id in user_ids:
+                # Remove all existing associations for this user_id
+                cursor.execute("""
+                    DELETE FROM App_Functions_Link
+                    WHERE user_id = ?
+                """, (user_id,))
+
+                # Now, link the user to the selected app functions
                 for function_name in selected_function_names:
                     selected_function_id = app_function_choices[function_name]
-
-                    # Check if the user-function link already exists
-                    cursor.execute("""
-                        SELECT COUNT(*)
-                        FROM App_Functions_Link
-                        WHERE user_id = ? AND app_function_id = ?
-                    """, (user_id, selected_function_id))
-                    already_linked = cursor.fetchone()[0] > 0
-
-                    # If link exists, skip (or you can choose to update if needed)
-                    if already_linked:
-                        continue
+                    #st.write("Function ID:", selected_function_id)
 
                     # Link user to the selected app function
-                    cursor.execute("INSERT INTO App_Functions_Link(app_function_id, user_id) VALUES (?, ?)", (selected_function_id, user_id))
+                    cursor.execute("""
+                        INSERT INTO App_Functions_Link(app_function_id, user_id) 
+                        VALUES (?, ?)
+                    """, (selected_function_id, user_id))
 
             conn.commit()
             st.success(f"Users matching the filter have been linked to selected app functions successfully!")
@@ -194,7 +189,8 @@ def create_prompt_template(user_id):
         ''', (user_id,))
         templates = cursor.fetchall()
         template_names = [template[1] for template in templates]
-
+        
+        
         # Replace text_input with selectbox for prompt_name
         selected_template_name = st.selectbox("Select a template name", template_names)
 
@@ -218,14 +214,14 @@ def create_prompt_template(user_id):
                 session_key = selected_template_name.replace(" ", "_").lower()
                 st.session_state[session_key] = new_prompt_description
                 
-
                 # Inform the user of successful update
                 st.write("Successfully updated the description.")
             else:
                 st.write("Ensure that the description field is not blank!")
+        return templates
 
 
-def update_prompt_template(profile_id, school_id_of_AD=None):
+def update_prompt_template(profile_id, templates):
     """
     Display the UI to update prompt templates in Streamlit based on filter.
 
@@ -239,45 +235,75 @@ def update_prompt_template(profile_id, school_id_of_AD=None):
         cursor = conn.cursor()
 
         selected_school_id = None
-        if profile_id == 'SA':
+        if profile_id == SA:
             # Fetch all schools
             cursor.execute("SELECT school_id, school_name FROM Schools")
             schools = cursor.fetchall()
+            # Check if there are no schools and exit if true
+            if not schools:
+                st.error("No schools available")
+                return
             school_choices = {school[1]: school[0] for school in schools}
             selected_school_name = st.selectbox("Select School:", list(school_choices.keys()))
             selected_school_id = school_choices[selected_school_name]
-        elif profile_id == 'AD':
-            selected_school_id = school_id_of_AD
+        elif profile_id == AD:
+            selected_school_id = st.session_state.user['school_id']
 
         # Fetch profiles except SA and AD
         cursor.execute("SELECT profile_id, profile_name FROM Profile WHERE profile_id NOT IN (?, ?)", (SA, AD))
         profiles = cursor.fetchall()
         profile_choices = {profile[1]: profile[0] for profile in profiles}
-        profile_choices["All Users"] = None  # Add "All Users" option
-        selected_profile_name = st.selectbox("Select Profile (Excludes SA & AD):", list(profile_choices.keys()))
-        selected_profile_id = profile_choices[selected_profile_name]
-
-        st.markdown("---")
-        btn_process = st.button("Update Templates Based on Filter")
-
+        #profile_choices["All Users"] = None  # Add "All Users" option
+        #selected_profile_name = st.selectbox("Select Profile (Excludes SA & AD):", list(profile_choices.keys()))
+        multiselect_profile_names = st.multiselect("Select Profiles (Excludes SA & AD):", list(profile_choices.keys()))
+        #selected_profile_id = multiselect_profile_names
+        # st.write("school id:", selected_school_id)
+        # st.write("profile id:", multiselect_profile_names)
+        # st.write("Profile choices:", profile_choices)
+        btn_process = st.button("Update Templates for profile")
+        st.divider()
         if btn_process:
             # Fetching user IDs based on filters
-            query = """
-                SELECT user_id 
-                FROM Users 
-                WHERE (school_id = ?) 
-                AND (profile_id = ? OR ? IS NULL)
-                AND profile_id NOT IN (?, ?)
-            """
-            cursor.execute(query, (selected_school_id, selected_profile_id, selected_profile_id, SA, AD))
-            user_ids = [row[0] for row in cursor.fetchall()]
+            for profile_name in multiselect_profile_names:
+                if profile_name in profile_choices:
+                    profile_id = profile_choices[profile_name]
+                    query = """
+                        SELECT user_id 
+                        FROM Users 
+                        WHERE (school_id = ?) 
+                        AND (profile_id = ?)
+                    """
+                    cursor.execute(query, (selected_school_id, profile_id))
+                    user_ids = [row[0] for row in cursor.fetchall()]
+                    # st.write("User IDs:", user_ids)
+                    for user_id in user_ids:
+                        # Check if the user has an existing prompt template
+                        for template_data in templates:
+                            template_name = template_data[1]
+                            template_description = template_data[2]
+                            # Check if this template name exists for the current user
+                            cursor.execute('''
+                                SELECT COUNT(1) 
+                                FROM Prompt_Templates 
+                                WHERE user_id = ? AND prompt_template = ?
+                            ''', (user_id, template_name))
+                            exists = cursor.fetchone()[0]
 
-            default_description = "Default description for the template."
-            for user_id in user_ids:
-                cursor.execute("UPDATE Prompt_Templates SET prompt_description = ? WHERE user_id = ?", (default_description, user_id))
-
-            conn.commit()
-            st.success(f"Prompt templates for users matching the filter have been updated successfully!")
+                            if exists:
+                                # Update the existing row with the current description
+                                cursor.execute('''
+                                    UPDATE Prompt_Templates 
+                                    SET prompt_description = ? 
+                                    WHERE user_id = ? AND prompt_template = ?
+                                ''', (template_description, user_id, template_name))
+                            else:
+                                # Insert a new row if it doesn't exist for this user
+                                cursor.execute('''
+                                    INSERT INTO Prompt_Templates (user_id, prompt_description, prompt_template) 
+                                    VALUES (?, ?, ?)
+                                ''', (user_id, template_description, template_name))
+                        conn.commit()
+                    st.success(f"Prompt templates for users matching the filter have been updated successfully!")
             
 #not in use part of the preload 
 def load_prompt_templates(user_id):
@@ -317,12 +343,6 @@ def pre_load_variables(user_id):
                 st.session_state[session_key] = existing_templates.get(function_name, DEFAULT_TEXT)
 
         conn.commit()
-        #pre load the lesson generator prompt from config ini
-        if st.session_state.lesson_generator == DEFAULT_TEXT:
-            st.session_state.lesson_generator = GENERATOR_PROMPT
-        #pre load the feedback generator prompt from config ini
-        if st.session_state.lesson_feedback == DEFAULT_TEXT:
-            st.session_state.lesson_feedback = FEEDBACK_PROMPT    
 
         # Fetch user_id and profile_id using user_id
         cursor.execute('''
@@ -348,26 +368,26 @@ def pre_load_variables(user_id):
 
 #loading and selecting of vectorestore is completed and done
 
-def load_available_shared_owned_vector_stores(user_id):
-    """
-    Query the database for shared vector stores and those created by the user.
-    Return their names and associated IDs.
-    """
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
+# def load_available_shared_owned_vector_stores(user_id):
+#     """
+#     Query the database for shared vector stores and those created by the user.
+#     Return their names and associated IDs.
+#     """
+#     with sqlite3.connect(WORKING_DATABASE) as conn:
+#         cursor = conn.cursor()
         
-        # Modified the SQL query to select both vectorstore_name and vs_id
-        cursor.execute('''
-            SELECT vs_id, vectorstore_name 
-            FROM Vector_Stores 
-            WHERE sharing_enabled = 1 OR user_id = ?
-        ''', (user_id,))
+#         # Modified the SQL query to select both vectorstore_name and vs_id
+#         cursor.execute('''
+#             SELECT vs_id, vectorstore_name 
+#             FROM Vector_Stores 
+#             WHERE sharing_enabled = 1 OR user_id = ?
+#         ''', (user_id,))
         
-        # Store the results as a list of dictionaries
-        vectorstores = [{"vs_id": row[0], "vectorstore_name": row[1]} for row in cursor.fetchall()]
-        st.write(vectorstores)
+#         # Store the results as a list of dictionaries
+#         vectorstores = [{"vs_id": row[0], "vectorstore_name": row[1]} for row in cursor.fetchall()]
+#         st.write(vectorstores)
         
-    return vectorstores
+#     return vectorstores
 
 
 def associate_vectorstore_with_user(user_id, vs_id):
@@ -392,59 +412,59 @@ def associate_vectorstore_with_user(user_id, vs_id):
         st.success(f"VectorStore ID {vs_id} associated with user ID {user_id}.")
 
 
-# Need change this
-def chat_bot_vectorstore_selection_interface(user_id, c1, c2):
-    """
-    Display Streamlit interface for vectorstore selection.
-    """
-    available_vectorstores = load_available_shared_owned_vector_stores(user_id)
+# # Need change this
+# def chat_bot_vectorstore_selection_interface(user_id, c1, c2):
+#     """
+#     Display Streamlit interface for vectorstore selection.
+#     """
+#     available_vectorstores = load_available_shared_owned_vector_stores(user_id)
 
-    if available_vectorstores:
-        #
-        with c1:
-            # Construct selectbox options
-            options = [vs['vectorstore_name'] for vs in available_vectorstores]
+#     if available_vectorstores:
+#         #
+#         with c1:
+#             # Construct selectbox options
+#             options = [vs['vectorstore_name'] for vs in available_vectorstores]
             
-            # Use the constructed options in Streamlit's selectbox
-            selected_vs_name = st.selectbox("Select Knowledge Base:", options, index=0, label_visibility="collapsed")
-        with c2:
-            if st.button("Save KB"):
-                if selected_vs_name:
-                    # Retrieve the selected vs_id
-                    selected_vs_id = next((vs['vs_id'] for vs in available_vectorstores if vs['vectorstore_name'] == selected_vs_name), None)
+#             # Use the constructed options in Streamlit's selectbox
+#             selected_vs_name = st.selectbox("Select Knowledge Base:", options, index=0, label_visibility="collapsed")
+#         with c2:
+#             if st.button("Save KB"):
+#                 if selected_vs_name:
+#                     # Retrieve the selected vs_id
+#                     selected_vs_id = next((vs['vs_id'] for vs in available_vectorstores if vs['vectorstore_name'] == selected_vs_name), None)
                     
-                    if selected_vs_id:
-                        associate_vectorstore_with_user(user_id, selected_vs_id)
-                        load_and_use_vectorstore(selected_vs_id)
-                        st.success("Preference saved successfully!")
-                    else:
-                        st.error("Error in retrieving the selected VectorStore ID.")
-                st.rerun()()     
-    else:
-        with c1:
-            st.write("No KB available.")
+#                     if selected_vs_id:
+#                         associate_vectorstore_with_user(user_id, selected_vs_id)
+#                         load_and_use_vectorstore(selected_vs_id)
+#                         st.success("Preference saved successfully!")
+#                     else:
+#                         st.error("Error in retrieving the selected VectorStore ID.")
+#                 st.rerun()()     
+#     else:
+#         with c1:
+#             st.write("No KB available.")
 
 #loading and selecting of vectorestore is completed and done
 
-def load_available_vector_stores(user_id):
-    """
-    Query the database for shared vector stores and those created by the user.
-    Return their names and associated IDs.
-    """
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
+# def load_available_vector_stores(user_id):
+#     """
+#     Query the database for shared vector stores and those created by the user.
+#     Return their names and associated IDs.
+#     """
+#     with sqlite3.connect(WORKING_DATABASE) as conn:
+#         cursor = conn.cursor()
         
-        # Modified the SQL query to select both vectorstore_name and vs_id
-        cursor.execute('''
-            SELECT vs_id, vectorstore_name 
-            FROM Vector_Stores 
-            WHERE sharing_enabled = 1 AND user_id = ?
-        ''', (user_id,))
+#         # Modified the SQL query to select both vectorstore_name and vs_id
+#         cursor.execute('''
+#             SELECT vs_id, vectorstore_name 
+#             FROM Vector_Stores 
+#             WHERE sharing_enabled = 1 AND user_id = ?
+#         ''', (user_id,))
         
-        # Store the results as a list of dictionaries
-        vectorstores = [{"vs_id": row[0], "vectorstore_name": row[1]} for row in cursor.fetchall()]
+#         # Store the results as a list of dictionaries
+#         vectorstores = [{"vs_id": row[0], "vectorstore_name": row[1]} for row in cursor.fetchall()]
         
-    return vectorstores
+#     return vectorstores
 
 
 def link_profiles_to_vectorstore_interface(user_id):
@@ -456,7 +476,7 @@ def link_profiles_to_vectorstore_interface(user_id):
         cursor = conn.cursor()
 
         # Fetch available vector stores for the user
-        available_vectorstores = load_available_vector_stores(user_id)
+        available_vectorstores = load_available_shared_owned_vector_stores(user_id)
         
         # Fetch profiles
         profiles = fetch_all_profiles(cursor)
@@ -547,7 +567,7 @@ def load_available_shared_owned_vector_stores(user_id):
         profile_id, org_id = profile_data
         
         # If profile_id is SA, return all vector stores
-        if profile_id == "SA":
+        if profile_id == SA:
             cursor.execute('''
                 SELECT vs_id, vectorstore_name 
                 FROM Vector_Stores
@@ -555,7 +575,7 @@ def load_available_shared_owned_vector_stores(user_id):
             return [{"vs_id": row[0], "vectorstore_name": row[1]} for row in cursor.fetchall()]
 
         # If profile_id is AD, return all vector stores from the same organization
-        elif profile_id == "AD":
+        elif profile_id == AD:
             cursor.execute('''
                 SELECT vs_id, vectorstore_name 
                 FROM Vector_Stores
@@ -598,7 +618,9 @@ def vectorstore_selection_interface(user_id):
     Display Streamlit interface for vectorstore selection.
     """
     vectorstores = load_available_shared_owned_vector_stores(user_id)
+    #st.write(vectorstores)
     available_vectorstores = remove_duplicates_from_vector_stores(vectorstores)
+    #st.write(available_vectorstores)
 
     st.subheader("Select knowledge base for the Bot:")
     st.write(f"Current loaded Knowledge Base: **:blue[{st.session_state.current_model}]**")
@@ -641,7 +663,7 @@ def load_and_use_vectorstore(vs_id):
         
         # Fetch the vectorstore_name and data for the provided vs_id
         cursor.execute('''
-            SELECT vectorstore_name, data
+            SELECT vectorstore_name, documents
             FROM Vector_Stores 
             WHERE vs_id = ?
         ''', (vs_id,))
@@ -652,58 +674,63 @@ def load_and_use_vectorstore(vs_id):
             st.warning("Vectorstore not found for the given ID.")
             return
 
-        vectorstore_name, data_blob = vectorstore_data
+        vectorstore_name, documents = vectorstore_data
 
-        if not data_blob:
-            st.warning("Vectorstore data not found.")
+        if not documents:
+            st.warning("Vectorstore documents not found.")
             return
 
-        # Deserialize the blob data (assuming it's pickled)
-        vector_data = pickle.loads(data_blob)
+        #convert the documents json to document objects
+        
 
         # Set the data and the associated name to Streamlit's session state
-        st.session_state.vs = vector_data
+        st.session_state.vs = load_vectorstore(documents, vectorstore_name)
         st.session_state.current_model = vectorstore_name
 
 
 def load_and_fetch_vectorstore_for_user(user_id):
     """
-    Load the associated vector store ID and data into the session state for the logged-in user. cannot use it for selection
+    Load the associated vector store ID and data into the session state for the logged-in user.
     """
-    with sqlite3.connect(WORKING_DATABASE) as conn:
-        cursor = conn.cursor()
-        
-        # Fetch associated vs_id and vectorstore_name for the user
-        cursor.execute('''
-            SELECT uvs.vs_id, vs.vectorstore_name
-            FROM User_VectorStores uvs
-            INNER JOIN Vector_Stores vs ON uvs.vs_id = vs.vs_id
-            WHERE uvs.user_id = ?
-        ''', (user_id,))
-        
-        vectorstore_data = cursor.fetchone()
-        
-        if not vectorstore_data:
-            st.warning("No vectorstore associated with the user.")
-            return
+    try:
+        with sqlite3.connect(WORKING_DATABASE) as conn:
+            cursor = conn.cursor()
+            
+            # Fetch associated vs_id and vectorstore_name for the user
+            cursor.execute('''
+                SELECT uvs.vs_id, vs.vectorstore_name
+                FROM User_VectorStores uvs
+                INNER JOIN Vector_Stores vs ON uvs.vs_id = vs.vs_id
+                WHERE uvs.user_id = ?
+            ''', (user_id,))
+            
+            vectorstore_data = cursor.fetchone()
+            
+            if not vectorstore_data:
+                st.warning("No vectorstore associated with the user.")
+                return None
 
-        vs_id, vectorstore_name = vectorstore_data
+            vs_id, vectorstore_name = vectorstore_data
 
-        # Fetch the actual vector data using the vs_id and user_id
-        cursor.execute('''
-            SELECT data FROM Vector_Stores WHERE vs_id=? AND user_id=?''', 
-            (vs_id, user_id)
-        )
+            # Fetch the actual vector data using the vs_id
+            cursor.execute('''
+                SELECT documents FROM Vector_Stores WHERE vs_id=?''', 
+                (vs_id,)
+            )
 
-        data_blob = cursor.fetchone()
+            documents = cursor.fetchone()
 
-        if not data_blob:
-            st.warning("Vectorstore data not found.")
-            return
+            if not documents:
+                st.warning("Vectorstore data not found.")
+                return None
 
-        vector_data = pickle.loads(data_blob[0])
+            vs = load_vectorstore(documents[0], vectorstore_name)
 
-        # Set data to Streamlit's session state
-        st.session_state.vs = vector_data
-        st.session_state.current_model = vectorstore_name
+            # Set data to Streamlit's session state
+            st.session_state['vs'] = vs
+            st.session_state['current_model'] = vectorstore_name
 
+            return vs
+    except sqlite3.DatabaseError as e:
+        st.error(f"An error occurred while accessing the database: {e}")
+        return None

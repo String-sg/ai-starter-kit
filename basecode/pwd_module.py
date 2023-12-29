@@ -1,5 +1,5 @@
 import sqlite3
-from authenticate import hash_password
+from basecode.authenticate import hash_password
 import streamlit as st
 import pandas as pd
 import configparser
