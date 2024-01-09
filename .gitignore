@@ -3,3 +3,6 @@ secrets.toml
 *.csv
 database/
 References/
+String Brand ID/
+*.pyc
+basecode/__pycache__/files_module.cpython-310.pyc
