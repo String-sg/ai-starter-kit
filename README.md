@@ -5,26 +5,23 @@
 
 Enabling teachers to experiment with LLM/ Generative AI 
 
-- Create an administrator account, password is pass1234 in a SQL Database
-- Generate 5 teachers account and 40 students
-
 ## Key Features:
 
-- Upload documents and build a knowledge base using the OpenAI embeddings
-- Enable semantic search on uploaded documents via [LanceDB](https://lancedb.com/)
-- Preset custom prompt engineering to guide interactions for Q&A
+1 **Text GenAI**:
+- a) **Chat Assistant** (Visibility into backend)
+- b) **Lesson Plan Generator**/ Collaborator (Scaffolding to create lesson plans)
+- c) **[Remarks Co-Pilot](https://remarkscopilot.vercel.app/)** (Draft student remarks); 
+- d) **Semantic search** on uploaded documents via [LanceDB](https://lancedb.com/)
 
-## User-role specific features
+2 **Voice GenAI**:
+- a) **Oral coach** (Personalized feedback based on audio input)
+- b) **Transcription** (Speech-to-text)
 
-> [!NOTE]  
-> This app comes with the following user roles: admins, teachers, and students
+3 [WIP] **Image GenAI**
+- a) **Create comic strips** (Creating reasonably consistent images across panels for composition writing)
+- b) **Historic stylistic art reimagination** (Superimposing art styles/ palettes over uploaded images)
 
-- **Admins** can create accounts, reset passwords of students and teachers
-- **Teachers** can add and remove documents
-- **Teachers** can build and remove knowledge base (VectorStores)
-- **Admins** can edit knowledge base and documents
-- **Admins** share documents among the 5 teachers
-- **Students** can load their own knowledge base for their own chatbot
+---
 
 You can fork it at streamlit community cloud for immediate use. Please configure the env variables accordingly:
 
