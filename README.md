@@ -2,7 +2,7 @@
 > We are in the process of a major cleanup. Feel free to test as it is but expect changes/ post cleanup! <:
 
 ![aistarterkit](https://github.com/String-sg/ai-starter-kit/assets/44336310/9379ce87-b737-4c74-afa8-24dae23d16cc)
-Enabling teachers to experiment with LLM/ Generative AI 
+<br>Enabling teachers to experiment with LLM/ Generative AI 
 
 
 ## Key Features:
