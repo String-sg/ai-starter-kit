@@ -76,6 +76,7 @@ from lcc.lesson_plan import (
     lesson_collaborator,
     lesson_bot,
     lesson_design_options,
+    lesson_commentator,
 )
 
 from PIL import Image
@@ -333,6 +334,13 @@ def main():
                                         "Lesson Collaborator"
                                     ),
                                 ),
+                                sac.MenuItem(
+                                    return_function_name(
+                                        "Lesson Commentator", "Lesson Commentator"
+                                    ),
+                                    icon="chat-left-dots",
+                                    disabled=is_function_disabled("Lesson Commentator"),
+                                ),
                             ],
                         ),
                         sac.MenuItem(
@@ -588,6 +596,21 @@ def main():
                         LESSON_COLLAB,
                     )
                     lesson_design_options()
+
+        elif st.session_state.option == "Lesson Commentator":
+            st.session_state.start = 5
+            st.subheader(f":green[{st.session_state.option}]")
+            container1 = st.container()
+
+            with container1:
+                # on = sac.buttons([sac.ButtonsItem(label=f"Continue Conversation at {LESSON_BOT}", color='#40826D')], format_func='title', index=None, size='small',type='primary')
+                st.session_state.lesson_col_prompt = lesson_commentator()
+                on = sac.switch(
+                    label=f"Continue Conversation at {LESSON_BOT}",
+                    value=False,
+                    align="start",
+                    position="left",
+                )
         elif st.session_state.option == "AI Chatbot":
             # Code for AI Chatbot - ZeroCode
             st.write("Current Chatbot Template: ", st.session_state.chatbot)

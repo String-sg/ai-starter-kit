@@ -1,9 +1,11 @@
 import streamlit as st
 import streamlit_antd_components as sac
+import tempfile
 import configparser
 import ast
 import os
 from langchain.memory import ConversationBufferWindowMemory
+from langchain.document_loaders import UnstructuredFileLoader
 from basecode.users_module import vectorstore_selection_interface
 
 import openai
@@ -299,3 +301,119 @@ def lesson_design_options():
         st.session_state.button_text = "Reset"
     else:
         st.warning("There is no lesson plan available for download.")
+
+
+# direct load into form
+def upload_lesson_plan():
+    def get_file_extension(file_name):
+        return os.path.splitext(file_name)[1]
+
+    # Streamlit file uploader to accept file input
+    uploaded_file = st.file_uploader(
+        "Upload a lesson plan file", type=["docx", "txt", "pdf"]
+    )
+
+    if uploaded_file:
+        # Reading file content
+        file_content = uploaded_file.read()
+
+        # Determine the suffix based on uploaded file's name
+        file_suffix = get_file_extension(uploaded_file.name)
+
+        # Saving the uploaded file temporarily to process it
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_suffix) as temp_file:
+            temp_file.write(file_content)
+            temp_file.flush()  # Ensure the data is written to the file
+            temp_file_path = temp_file.name
+
+        # Process the temporary file using UnstructuredFileLoader (or any other method you need)
+        # st.write(temp_file_path)
+        loader = UnstructuredFileLoader(temp_file_path)
+        docs = loader.load()
+
+        st.success("File processed and added to form")
+
+        # Removing the temporary file after processing
+        os.remove(temp_file_path)
+        return docs
+
+
+def count_words(text):
+    return len(text)
+
+
+def lesson_commentator():
+    st.subheader("1. Basic Lesson Information for Feedback")
+    subject = st.selectbox("Choose a Subject", SUBJECTS_SINGAPORE)
+    level = st.selectbox("Choose a level", EDUCATION_LEVELS)
+    duration = st.text_input(
+        "Duration (in minutes)",
+        help="Estimated duration of one lesson or over a few lessons",
+    )
+
+    st.subheader("2. Lesson Details for Feedback")
+    topic = st.text_area(
+        "Topic", help="Describe the specific topic or theme for the lesson"
+    )
+    skill_level = st.text_input(
+        "Readiness Level", help="Beginner, Intermediate, Advanced ..."
+    )
+
+    st.subheader("3. Lesson Plan upload or key in manually")
+    lesson_plan_content = upload_lesson_plan()
+    if lesson_plan_content is not None and lesson_plan_content != "":
+        if count_words(lesson_plan_content) > 6000:
+            st.error(
+                "Your lesson plan is too long. Please shorten it to 6000 chars or less."
+            )
+            return
+
+    lesson_plan = st.text_area(
+        "Please provide your lesson plan either upload or type into this text box (Max 6000 characters), including details such as learning objectives, activities, assessment tasks, and any use of educational technology tools.",
+        height=500,
+        max_chars=6000,
+        value=lesson_plan_content,
+    )
+
+    st.subheader("4. Specific questions that I would like feedback on")
+    feedback = st.text_area(
+        "Include specific information from your lesson plan that you want feedback on."
+    )
+
+    st.subheader("5. Learners Profile")
+    learners_info = st.text_input("Describe the learners for this lesson ")
+
+    vectorstore_selection_interface(st.session_state.user["id"])
+    build = sac.buttons(
+        [
+            sac.ButtonsItem(label="Feedback", icon="check-circle-fill", color="green"),
+            sac.ButtonsItem(label="Cancel", icon="x-circle-fill", color="red"),
+        ],
+        label=None,
+        index=None,
+        format_func="title",
+        align="center",
+        position="top",
+        size="default",
+        direction="horizontal",
+        shape="round",
+        type="default",
+        compact=False,
+    )
+
+    if build == "Feedback":
+        feedback_template = f"""Imagine you are an experienced teacher. I'd like feedback on the lesson I've uploaded:
+			Subject: {subject}
+			Topic: {topic}
+			Level: {level}
+			Duration: {duration} minutes
+			Skill Level: {skill_level}
+			Lesson Plan Content: {lesson_plan}
+			Specific Feedback Areas: {feedback}
+			Description of Learners: {learners_info}
+			Please provide feedback to enhance this lesson plan."""
+        st.success("Your lesson plan has been submitted for feedback!")
+        return feedback_template
+
+    else:
+        return False
