@@ -470,7 +470,95 @@ def main():
             vectorstore_selection_interface(st.session_state.user["id"])
 
         elif st.session_state.option == "Lesson Collaborator (Chatbot)":
-            pass
+            st.subheader(f":green[{st.session_state.option}]")
+            choice = sac.buttons(
+                [
+                    sac.ButtonsItem(
+                        label="Collaborator Mode", icon="person-hearts", color="green"
+                    ),
+                    sac.ButtonsItem(label="Default", icon="person-fill", color="blue"),
+                    sac.ButtonsItem(
+                        label="Commentator Mode", icon="person-plus-fill", color="red"
+                    ),
+                ],
+                index=st.session_state.chatbot_index,
+                format_func="title",
+                align="center",
+                size="small",
+                type="default",
+            )
+            sac.divider(
+                label="Chabot Settings",
+                icon="robot",
+                align="center",
+            )
+
+            if choice == "Collaborator Mode":
+                st.session_state.chatbot = st.session_state.collaborator_mode
+            elif choice == "Default Chatbot":  # remove the chatbot template
+                st.session_state.chatbot = st.session_state.lesson_default
+            elif choice == "Commentator Mode":
+                st.session_state.chatbot = st.session_state.commentator_mode
+
+            # check if API key is entered
+            with st.expander("Lesson Designer Settings"):
+                vectorstore_selection_interface(st.session_state.user["id"])
+                # new options --------------------------------------------------------
+                if st.session_state.vs:
+                    vs_flag = False
+                else:
+                    vs_flag = True
+
+                options = sac.chip(
+                    items=[
+                        sac.ChipItem(
+                            label="Raw Search", icon="search", disabled=vs_flag
+                        ),
+                        sac.ChipItem(label="Enable Memory", icon="memory"),
+                        sac.ChipItem(label="Rating Function", icon="star-fill"),
+                        sac.ChipItem(label="Capture Responses", icon="camera-fill"),
+                        sac.ChipItem(label="Download Responses", icon="download"),
+                    ],
+                    index=[1, 2, 3],
+                    format_func="title",
+                    radius="sm",
+                    size="sm",
+                    align="left",
+                    variant="light",
+                    multiple=True,
+                )
+                # Update state based on new chip selections
+                raw_search = "Raw Search" in options
+                st.session_state.memoryless = "Enable Memory" not in options
+                st.session_state.rating = "Rating Function" in options
+                st.session_state.download_response_flag = "Capture Responses" in options
+                preview_download_response = "Download Responses" in options
+
+                clear = sac.switch(
+                    label="Clear Chat", value=False, align="start", position="left"
+                )
+                if clear == True:
+                    clear_session_states()
+                if preview_download_response:
+                    complete_my_lesson()
+
+                if st.session_state.vs:  # chatbot with knowledge base
+                    if raw_search == True:
+                        search_bot()
+                    else:
+                        if st.session_state.memoryless:
+                            # memoryless chatbot with knowledge base but no memory
+                            basebot_qa(LESSON_BOT)
+                        else:
+                            # chatbot with knowledge base and memory
+                            basebot_qa_memory(LESSON_BOT)
+                else:  # chatbot with no knowledge base
+                    if st.session_state.memoryless:
+                        # memoryless chatbot with no knowledge base and no memory
+                        basebot(LESSON_BOT)
+                    else:
+                        # chatbot with no knowledge base but with memory
+                        basebot_memory(LESSON_BOT)
 
         elif st.session_state.option == "Lesson Collaborator (Scaffolded)":
             st.session_state.start = 4
