@@ -72,7 +72,7 @@ from basecode.users_module import (
 )
 
 from basecode.bot_settings import bot_settings_interface, load_bot_settings
-from basecode.lcc.lesson_plan import (
+from lcc.lesson_plan import (
     lesson_collaborator,
     lesson_bot,
     lesson_design_options,
@@ -319,10 +319,9 @@ def main():
                                         "Lesson Collaborator (Chatbot)",
                                     ),
                                     icon="chat-text",
-                                    disabled=False
-                                    # disabled=is_function_disabled(
-                                    #     "Lesson Design Facilitator"
-                                    # ),
+                                    disabled=is_function_disabled(
+                                        "Lesson Design Facilitator"
+                                    ),
                                 ),
                             ],
                         ),

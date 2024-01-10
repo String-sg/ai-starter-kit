@@ -4,11 +4,12 @@ import configparser
 import ast
 import os
 from langchain.memory import ConversationBufferWindowMemory
-from ..users_module import vectorstore_selection_interface
+from basecode.users_module import vectorstore_selection_interface
 
 import openai
-from ..authenticate import return_api_key
-from ..main_bot import insert_into_data_table
+from openai import OpenAI
+from basecode.authenticate import return_api_key
+from basecode.main_bot import insert_into_data_table
 
 from datetime import datetime
 from Markdown2docx import Markdown2docx
@@ -23,6 +24,11 @@ SEC_LEVELS = [f"Secondary {i}" for i in range(1, 6)]
 JC_LEVELS = [f"Junior College {i}" for i in range(1, 4)]
 EDUCATION_LEVELS = PRI_LEVELS + SEC_LEVELS + JC_LEVELS
 LESSON_COLLAB = config["constants"]["LESSON_COLLAB"]
+
+client = OpenAI(
+    # defaults to os.environ.get("OPENAI_API_KEY")
+    api_key=return_api_key(),
+)
 
 
 def commentator_rating():
@@ -74,7 +80,7 @@ def lesson_bot(prompt, prompt_template, bot_name):
                 reference_prompt = ""
             full_response = ""
             for response in template_prompt(prompt, reference_prompt + prompt_template):
-                full_response += response.choices[0].delta.get("content", "")
+                full_response += response.choices[0].delta.content or ""
                 message_placeholder.markdown(full_response + "▌")
             if bot_name == LESSON_COLLAB:
                 feedback_value = generator_rating()
@@ -122,9 +128,24 @@ def lesson_bot(prompt, prompt_template, bot_name):
 
 
 def template_prompt(prompt, prompt_template):
+    client = OpenAI(
+        # defaults to os.environ.get("OPENAI_API_KEY")
+        api_key=return_api_key(),
+    )
     openai.api_key = return_api_key()
     os.environ["OPENAI_API_KEY"] = return_api_key()
-    response = openai.ChatCompletion.create(
+
+    # response = openai.ChatCompletion.create(
+    #     model=st.session_state.openai_model,
+    #     messages=[
+    #         {"role": "system", "content": prompt_template},
+    #         {"role": "user", "content": prompt},
+    #     ],
+    #     temperature=st.session_state.temp,  # settings option
+    #     stream=True,  # settings option
+    # )
+
+    response = client.chat.completions.create(
         model=st.session_state.openai_model,
         messages=[
             {"role": "system", "content": prompt_template},
@@ -133,6 +154,7 @@ def template_prompt(prompt, prompt_template):
         temperature=st.session_state.temp,  # settings option
         stream=True,  # settings option
     )
+
     return response
 
 
