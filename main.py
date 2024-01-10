@@ -323,6 +323,16 @@ def main():
                                         "Lesson Design Facilitator"
                                     ),
                                 ),
+                                sac.MenuItem(
+                                    return_function_name(
+                                        "Lesson Collaborator",
+                                        "Lesson Collaborator (Scaffolded)",
+                                    ),
+                                    icon="pencil-square",
+                                    disabled=is_function_disabled(
+                                        "Lesson Collaborator"
+                                    ),
+                                ),
                             ],
                         ),
                         sac.MenuItem(
@@ -460,6 +470,9 @@ def main():
             vectorstore_selection_interface(st.session_state.user["id"])
 
         elif st.session_state.option == "Lesson Collaborator (Chatbot)":
+            pass
+
+        elif st.session_state.option == "Lesson Collaborator (Scaffolded)":
             st.session_state.start = 4
             st.subheader(f":green[{st.session_state.option}]")
             container = st.container()
