@@ -4,3 +4,4 @@ secrets.toml
 database/
 References/
 String Brand ID/
+__pycache__/
