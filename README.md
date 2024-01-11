@@ -52,12 +52,14 @@ sql_ext_path = "None"
 
 ## Setting up local dev env
 
-To run this locally, first clone it to your local computer via Git. See [here](https://teachertech.beehiiv.com/p/git-for-beginners) for a crash course to git.
-<br><br>
-Prior to running locally, you will need to install required dependencies via this command
-`pip install -r requirements.txt`
+To run this locally, follow the steps below. 
 
-To run this locally
-`streamlit run main.py`
+1. Clone it to your local computer via Git. See [here](https://teachertech.beehiiv.com/p/git-for-beginners) for a crash course to git.
+2. Create a virtual environment while in the project root directory. See [here](https://realpython.com/python-virtual-environments-a-primer/#create-it) for how to create one.
+3. Prior to running locally, you will need to install required dependencies via this command `pip install -r requirements.txt`
+    - If you encounter errors while installing the dependencies that is not related to 'conflicting dependencies', try `pip install -r requirements.txt --default-timeout=100`
+    - Alternatively try again after some time.
+4. To run this locally, run `streamlit run main.py` 
 <br><br>
+
 **Questions?** Ask them on [WhatsApp](https://chat.whatsapp.com/LTNrg30pSil6vuq4zpnhc2) | [Discord](https://discord.gg/dYKVqzfdNH)
