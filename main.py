@@ -77,6 +77,7 @@ from lcc.lesson_plan import (
     lesson_bot,
     lesson_design_options,
     lesson_commentator,
+    lesson_map_generator,
 )
 
 from PIL import Image
@@ -341,6 +342,16 @@ def main():
                                     icon="chat-left-dots",
                                     disabled=is_function_disabled("Lesson Commentator"),
                                 ),
+                                # Jun Wen: Hiding this menu item as advised by Joe.
+                                # sac.MenuItem(
+                                #     return_function_name(
+                                #         "Lesson Designer Map", "Lesson Designer Map"
+                                #     ),
+                                #     icon="diagram-2",
+                                #     disabled=is_function_disabled(
+                                #         "Lesson Designer Map"
+                                #     ),
+                                # ),
                             ],
                         ),
                         sac.MenuItem(
@@ -501,6 +512,7 @@ def main():
                 align="center",
             )
 
+            # st.session_state.chatbot are prompt designs that are configured in config.ini
             if choice == "Collaborator Mode":
                 st.session_state.chatbot = st.session_state.collaborator_mode
             elif choice == "Default Chatbot":  # remove the chatbot template
@@ -550,23 +562,23 @@ def main():
                 if preview_download_response:
                     complete_my_lesson()
 
-                if st.session_state.vs:  # chatbot with knowledge base
-                    if raw_search == True:
-                        search_bot()
-                    else:
-                        if st.session_state.memoryless:
-                            # memoryless chatbot with knowledge base but no memory
-                            basebot_qa(LESSON_BOT)
-                        else:
-                            # chatbot with knowledge base and memory
-                            basebot_qa_memory(LESSON_BOT)
-                else:  # chatbot with no knowledge base
+            if st.session_state.vs:  # chatbot with knowledge base
+                if raw_search == True:
+                    search_bot()
+                else:
                     if st.session_state.memoryless:
-                        # memoryless chatbot with no knowledge base and no memory
-                        basebot(LESSON_BOT)
+                        # memoryless chatbot with knowledge base but no memory
+                        basebot_qa(LESSON_BOT)
                     else:
-                        # chatbot with no knowledge base but with memory
-                        basebot_memory(LESSON_BOT)
+                        # chatbot with knowledge base and memory
+                        basebot_qa_memory(LESSON_BOT)
+            else:  # chatbot with no knowledge base
+                if st.session_state.memoryless:
+                    # memoryless chatbot with no knowledge base and no memory
+                    basebot(LESSON_BOT)
+                else:
+                    # chatbot with no knowledge base but with memory
+                    basebot_memory(LESSON_BOT)
 
         elif st.session_state.option == "Lesson Collaborator (Scaffolded)":
             st.session_state.start = 4
@@ -611,6 +623,10 @@ def main():
                     align="start",
                     position="left",
                 )
+        elif st.session_state.option == "Lesson Designer Map":
+            st.subheader(f":green[{st.session_state.option}]")
+            lesson_map_generator()
+
         elif st.session_state.option == "AI Chatbot":
             # Code for AI Chatbot - ZeroCode
             st.write("Current Chatbot Template: ", st.session_state.chatbot)

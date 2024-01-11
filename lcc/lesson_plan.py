@@ -16,6 +16,8 @@ from basecode.main_bot import insert_into_data_table
 from datetime import datetime
 from Markdown2docx import Markdown2docx
 
+from lcc.k_mapp import generate_mindmap, output_mermaid_diagram
+
 config = configparser.ConfigParser()
 config.read("config.ini")
 
@@ -417,3 +419,87 @@ def lesson_commentator():
 
     else:
         return False
+
+
+def lesson_design_map(lesson_plan):
+    """
+    Generates a prompt based on a response from a chatbot for Mermaid diagram.
+
+    Args:
+            bot_response (str): Response from a chatbot over a topic.
+    Returns:
+            str: Generated prompt
+    """
+
+    prompt = f"""Given the lesson plan that is provided below: '{lesson_plan}', 
+				 You must generate a git diagram using the Mermaid JS syntax with reference to the lesson plan above.
+				 You will need to have one main branch and create 4 branches
+				 Each new branch is called individual, group, class or community.
+				 For each of the activities in the lesson plan, you must determine how the activity is focused on the individual, group, class or community.
+				 You must create a path that maps the activities to the branches in a linear order such that each activity is mapped to one of the 4 branches.
+				 The main branch is the start lesson branch
+				 For each activity, you must create three commmit id for each activity.The first commit id is the activity name.
+				 The second commit is the lesson brief details in 3 words and the last commit is the tool used for the activity.
+				 Here is an example on how a lesson plan is mapped to a git diagram.
+				 %%{{init: {{ 'logLevel': 'debug', 'theme': 'base', 'gitGraph': {{'showBranches': true, 'showCommitLabel':true,'mainBranchName': "Class Start"}}}} }}%%
+					gitGraph
+						commit id: "Objective 1"
+						commit id: "Objective 2"
+						commit id: "Objective 3"
+						branch Class
+						commit id: "1.Activity"
+						commit id: "1.Lesson Detail"
+						commit id: "1.Tools"
+						branch Group
+						commit id: "2.Activity"
+						commit id: "2.Lesson Detail"
+						commit id: "2.Tools"
+						branch Individual
+						checkout Individual
+						commit id: "3.Activity"
+						commit id: "3.Lesson Detail"
+						commit id: "3.Tools"
+						checkout Class
+						merge Individual
+						commit id: "4.Activity"
+						commit id: "4.Lesson Detail"
+						commit id: "4.Tools"
+						branch Community
+						checkout Community
+						commit id: "5.Activity"
+						commit id: "5.Lesson Detail"
+						commit id: "5.Tools"
+						checkout Individual
+						merge Community
+						commit id: "6.Activity"
+						commit id: "6.Lesson Detail"
+						commit id: "6.Tools"
+				You must use the init setting of the syntax to set the gitgraph
+				You must remove the extra "{" and "}" in the syntax below.
+				You must create a new flow mermaid syntax based on the given syntax example to suit the lesson plan.
+				You must output the mermaid syntax between these special brackets with * and &: *(& MERMAID SYNTAX &)*"""
+
+    return prompt
+
+
+def lesson_map_generator():
+    try:
+        with st.form("Lesson Map"):
+            st.subheader("Lesson Map Generator")
+            st.write(
+                "Please input or edit the lesson plan below from the lesson generator"
+            )
+            lesson_plan = st.text_area(
+                "Lesson Plan", height=500, value=st.session_state.lesson_plan
+            )
+            submit = st.form_submit_button("Generate Lesson Map")
+            if submit:
+                with st.status("Generating Lesson Map"):
+                    diagram_prompt = lesson_design_map(lesson_plan)
+                    syntax = generate_mindmap(diagram_prompt)
+                if syntax:
+                    output_mermaid_diagram(syntax)
+                    st.success("Lesson Map Generated!")
+
+    except Exception as e:
+        st.error(e)
