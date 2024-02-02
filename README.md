@@ -9,9 +9,8 @@
 
 1 **Text GenAI**:
 - a) **Chat Assistant** (Visibility into backend)
-- b) **Lesson Plan Generator**/ Collaborator (Scaffolding to create lesson plans)
-- c) **[Remarks Co-Pilot](https://remarkscopilot.vercel.app/)** (Draft student remarks); 
-- d) **Semantic search** on uploaded documents via [LanceDB](https://lancedb.com/)
+- b) **[Remarks Co-Pilot](https://remarkscopilot.vercel.app/)** (Draft student remarks); 
+- c) **Semantic search** on uploaded documents via [LanceDB](https://lancedb.com/)
 
 2 **Voice GenAI**:
 - a) **Oral coach** (Personalized feedback based on audio input)
