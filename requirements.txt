@@ -1,5 +1,5 @@
 aiofiles==23.2.1
-aiohttp==3.8.5
+aiohttp==3.9.2
 aiosignal==1.3.1
 altair==5.1.1
 annotated-types==0.5.0
@@ -27,7 +27,7 @@ charset-normalizer==3.2.0
 click==8.1.7
 coloredlogs==15.0.1
 contourpy==1.1.0
-cryptography==41.0.3
+cryptography==42.0.4
 cycler==0.11.0
 dataclasses-json==0.5.14
 decorator==5.1.1
@@ -46,7 +46,7 @@ Faker==19.13.0
 filelock==3.12.3
 filetype==1.2.0
 flatbuffers==23.5.26
-fonttools==4.42.1
+fonttools==4.43.0
 frozenlist==1.4.0
 fsspec==2023.9.0
 gitdb==4.0.10
@@ -67,7 +67,7 @@ install==1.3.5
 iopath==0.1.10
 ipython==8.16.1
 jedi==0.19.1
-Jinja2==3.1.2
+Jinja2==3.1.3
 jmespath==1.0.1
 joblib==1.3.2
 jsonpatch==1.33
@@ -76,7 +76,7 @@ jsonschema==4.19.0
 jsonschema-specifications==2023.7.1
 kiwisolver==1.4.5
 lancedb==0.2.2
-langchain==0.0.314
+langchain==0.0.329
 langdetect==1.0.9
 langsmith==0.0.43
 layoutparser==0.3.4
@@ -126,7 +126,7 @@ protobuf==4.24.3
 ptyprocess==0.7.0
 pure-eval==0.2.2
 py==1.11.0
-pyarrow==13.0.0
+pyarrow==14.0.1
 pycocotools==2.0.7
 pycparser==2.21
 pydantic==1.10.13
@@ -145,7 +145,7 @@ python-docx==0.8.11
 python-dotenv==1.0.0
 python-iso639==2023.6.15
 python-magic==0.4.27
-python-multipart==0.0.6
+python-multipart==0.0.7
 python-pptx==0.6.21
 pytz==2023.3.post1
 pytz-deprecation-shim==0.1.0.post0
@@ -169,7 +169,7 @@ socksio==1.0.0
 soupsieve==2.5
 SQLAlchemy==1.4.49
 stack-data==0.6.3
-streamlit==1.27.2
+streamlit==1.30.0
 streamlit-antd-components==0.2.4
 streamlit-audiorec==0.1.3
 streamlit-js-eval==0.1.5
@@ -186,7 +186,7 @@ torchvision==0.15.2
 tornado==6.3.3
 tqdm==4.66.1
 traitlets==5.11.2
-transformers==4.33.1
+transformers==4.36.0
 txtai==6.0.0
 typing-inspect==0.9.0
 typing_extensions==4.7.1
@@ -195,7 +195,7 @@ tzlocal==4.3.1
 unstructured==0.10.12
 unstructured-inference==0.5.25
 unstructured.pytesseract==0.3.12
-urllib3==2.0.4
+urllib3==2.0.7
 validators==0.22.0
 wcwidth==0.2.8
 wikipedia==1.4.0
