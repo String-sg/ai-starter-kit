@@ -1,5 +1,8 @@
-> [!WARNING]  
-> We are in the process of a major cleanup. Feel free to test as it is but expect changes/ post cleanup! <:
+> [!WARNING]
+> **Retired by owner decision on 18 October 2026.**
+> This 2023 AI workshop kit is retained as a historical reference and is no longer maintained. The previously announced cleanup is no longer planned.
+> The original feature descriptions, examples, and setup below are preserved for provenance. They are historical material, have not been revalidated for current deployment, and are not a supported deployment guide.
+> No maintained successor is designated.
 
 ![aistarterkit](https://github.com/String-sg/ai-starter-kit/assets/44336310/9379ce87-b737-4c74-afa8-24dae23d16cc)
 <br>Enabling teachers to experiment with LLM/ Generative AI 
